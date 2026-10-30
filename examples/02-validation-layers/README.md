@@ -4,7 +4,7 @@
 
 The Vulkan API itself performs limited error checking. During development, enable a validation layer to receive messages about invalid arguments or incorrect object usage order. The layer checks for problems, and the callback written in this lesson prints its messages to the console.
 
-[main.cpp](main.cpp) starts with the instance creation code from lesson 01. Begin by checking whether the layer is available. Once published, the completed code is available in `examples/99-completed/02-validation-layers.cpp`.
+[main.cpp](main.cpp) starts with the instance creation code from lesson 01. Begin by checking whether the layer is available. The [completed code](../99-completed/02-validation-layers.cpp) is available for comparison.
 
 ## Define the layer name
 
@@ -336,7 +336,7 @@ cmake --build build --config Debug --target validation_layers
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
+To run the completed example, run the CMake configuration command above, then build and run it with these commands.
 
 ```powershell
 cmake --build build --config Debug --target validation_layers_completed
@@ -353,7 +353,7 @@ cmake --build build --target validation_layers
 ./build/main
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
+To run the completed example, run the CMake configuration command above, then build and run it with these commands.
 
 ```sh
 cmake --build build --target validation_layers_completed

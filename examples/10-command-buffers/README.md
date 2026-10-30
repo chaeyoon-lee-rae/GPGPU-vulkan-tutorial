@@ -6,7 +6,7 @@ Lesson 09 created the compute pipeline. This lesson binds the pipeline and descr
 
 Recording commands first and submitting them together avoids making the CPU wait for every GPU operation to finish. If the operation order and resources stay the same, the recording can also be reused. The next lesson changes only the input data and submits the same command buffer again.
 
-Write the code in [main.cpp](main.cpp) in the order below. This lesson ends at recording; queue submission and result verification are added in the next lesson. Once published, the completed code is available in `examples/99-completed/10-command-buffers.cpp`.
+Write the code in [main.cpp](main.cpp) in the order below. This lesson ends at recording; queue submission and result verification are added in the next lesson. The [completed code](../99-completed/10-command-buffers.cpp) is available for comparison.
 
 ## Store the pool and command buffer
 
@@ -221,7 +221,7 @@ cmake --build build --config Debug --target command_buffers_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, use the same configuration to build and run it as follows.
+To run the completed example, use the same configuration to build and run it as follows.
 
 ```powershell
 cmake --build build --config Debug --target command_buffers_completed
@@ -238,7 +238,7 @@ cmake --build build --target command_buffers_example
 ./build/main
 ```
 
-If the completed example is available, use the same configuration to build and run it as follows.
+To run the completed example, use the same configuration to build and run it as follows.
 
 ```sh
 cmake --build build --target command_buffers_completed

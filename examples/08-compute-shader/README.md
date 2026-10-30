@@ -6,7 +6,7 @@ The previous lesson connected inputs `inputA` and `inputB` and output `output` t
 
 The shader is written in GLSL and converted to a SPIR-V binary during the build. The C++ program reads this binary and passes it to Vulkan. This lesson ends at module creation; GPU computation runs in later lessons that record and submit commands.
 
-Open [add.comp](add.comp) and [main.cpp](main.cpp). The shader file is provided in its completed form, so first examine its declarations and calculation. `main.cpp` contains the code through lesson 07. Once published, the completed code is available in `examples/99-completed/08-compute-shader.cpp`.
+Open [add.comp](add.comp) and [main.cpp](main.cpp). The shader file is provided in its completed form, so first examine its declarations and calculation. `main.cpp` contains the code through lesson 07. The [completed code](../99-completed/08-compute-shader.cpp) is available for comparison.
 
 ## Assign work to each shader invocation
 
@@ -249,7 +249,7 @@ cmake --build build --config Debug --target compute_shader_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, build and run it with these commands in the same configuration.
+Build and run the completed example with these commands in the same configuration.
 
 ```powershell
 cmake --build build --config Debug --target compute_shader_completed
@@ -266,7 +266,7 @@ cmake --build build --target compute_shader_example
 ./build/main
 ```
 
-If the completed example is available, build and run it with these commands in the same configuration.
+Build and run the completed example with these commands in the same configuration.
 
 ```sh
 cmake --build build --target compute_shader_completed

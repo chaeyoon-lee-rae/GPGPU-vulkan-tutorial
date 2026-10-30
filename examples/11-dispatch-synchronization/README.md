@@ -4,7 +4,7 @@
 
 Submit the command buffer recorded in lesson 10 to the compute queue, then read the output buffer on the CPU after GPU computation finishes. Compare the results with `A[i] + B[i]`, change the inputs, and execute the same commands once more.
 
-Write the code in [main.cpp](main.cpp) in the order below. Once published, the completed code is available in `examples/99-completed/11-dispatch-synchronization.cpp`.
+Write the code in [main.cpp](main.cpp) in the order below. The [completed code](../99-completed/11-dispatch-synchronization.cpp) is available for comparison.
 
 ## What is needed before reading the results
 
@@ -311,7 +311,7 @@ cmake --build build --config Debug --target dispatch_synchronization_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, use the same configuration to build and run it as follows.
+To run the completed example, use the same configuration to build and run it as follows.
 
 ```powershell
 cmake --build build --config Debug --target dispatch_synchronization_completed
@@ -328,7 +328,7 @@ cmake --build build --target dispatch_synchronization_example
 ./build/main
 ```
 
-If the completed example is available, use the same configuration to build and run it as follows.
+To run the completed example, use the same configuration to build and run it as follows.
 
 ```sh
 cmake --build build --target dispatch_synchronization_completed

@@ -6,7 +6,7 @@ The previous lesson compiled the vector addition shader to SPIR-V and created a 
 
 A pipeline layout defines descriptor set layouts and push constant ranges. A compute pipeline combines this layout with a shader entry point to prepare an operation for GPU execution. Creation may involve device-specific compilation and optimization, so a pipeline is usually reused across multiple dispatches. See [Pipelines and compilation](https://docs.vulkan.org/guide/latest/pipeline_cache.html).
 
-[main.cpp](main.cpp) contains the code through lesson 08. Add the two objects and their creation functions in the order below. Once published, the completed code is available in `examples/99-completed/09-compute-pipeline.cpp`. [add.comp](add.comp) and the shader build rules are unchanged from the previous lesson.
+[main.cpp](main.cpp) contains the code through lesson 08. Add the two objects and their creation functions in the order below. The [completed code](../99-completed/09-compute-pipeline.cpp) is available for comparison. [add.comp](add.comp) and the shader build rules are unchanged from the previous lesson.
 
 ## Distinguish the two layouts
 
@@ -168,7 +168,7 @@ cmake --build build --config Debug --target compute_pipeline_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, build and run it with these commands in the same configuration.
+Build and run the completed example with these commands in the same configuration.
 
 ```powershell
 cmake --build build --config Debug --target compute_pipeline_completed
@@ -185,7 +185,7 @@ cmake --build build --target compute_pipeline_example
 ./build/main
 ```
 
-If the completed example is available, build and run it with these commands in the same configuration.
+Build and run the completed example with these commands in the same configuration.
 
 ```sh
 cmake --build build --target compute_pipeline_completed

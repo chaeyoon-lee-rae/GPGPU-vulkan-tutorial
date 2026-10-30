@@ -13,7 +13,7 @@ The final result is `A + 2B`. Since the next operation also runs on the GPU, the
 
 These additions could also be combined into one shader to reduce dispatches and intermediate buffer accesses. This lesson uses two dispatches to examine the buffer connections and synchronization also needed when connecting different operations.
 
-Write the code in [main.cpp](main.cpp) in the order below. Once published, the completed code is available in `examples/99-completed/13-multiple-dispatches.cpp`.
+Write the code in [main.cpp](main.cpp) in the order below. The [completed code](../99-completed/13-multiple-dispatches.cpp) is available for comparison.
 
 ## Distinguish the pipeline from its input bindings
 
@@ -241,7 +241,7 @@ cmake --build build --config Debug --target multiple_dispatches_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, build and run it with these commands.
+Build and run the completed example with these commands.
 
 ```powershell
 cmake --build build --config Debug --target multiple_dispatches_completed
@@ -258,7 +258,7 @@ cmake --build build --target multiple_dispatches_example
 ./build/main
 ```
 
-If the completed example is available, build and run it with these commands.
+Build and run the completed example with these commands.
 
 ```sh
 cmake --build build --target multiple_dispatches_completed

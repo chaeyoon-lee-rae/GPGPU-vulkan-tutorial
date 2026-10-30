@@ -4,7 +4,7 @@
 
 In lesson 11, the compute shader used the same storage buffers that the CPU mapped. This lesson separates the buffers used for CPU transfers from those used for GPU computation. Keep the shader's `A + B` calculation and add input uploads and result downloads to the command buffer.
 
-Write the code in [main.cpp](main.cpp) in the order below. Once published, the completed code is available in `examples/99-completed/12-staging-buffers.cpp`.
+Write the code in [main.cpp](main.cpp) in the order below. The [completed code](../99-completed/12-staging-buffers.cpp) is available for comparison.
 
 ## Separate transfer buffers from compute buffers
 
@@ -263,7 +263,7 @@ cmake --build build --config Debug --target staging_buffers_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, build and run it with these commands.
+Build and run the completed example with these commands.
 
 ```powershell
 cmake --build build --config Debug --target staging_buffers_completed
@@ -280,7 +280,7 @@ cmake --build build --target staging_buffers_example
 ./build/main
 ```
 
-If the completed example is available, build and run it with these commands.
+Build and run the completed example with these commands.
 
 ```sh
 cmake --build build --target staging_buffers_completed

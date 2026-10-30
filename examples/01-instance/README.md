@@ -4,7 +4,7 @@
 
 To use Vulkan, first create an instance. The instance connects the application to the Vulkan library. When creating it, provide information about the program and the API version it will use.
 
-Open [main.cpp](main.cpp) and fill in the code by following the instructions below. Once published, the completed code is available in `examples/99-completed/01-instance.cpp`.
+Open [main.cpp](main.cpp) and fill in the code by following the instructions below. The [completed code](../99-completed/01-instance.cpp) is available for comparison.
 
 ## Find where initialization starts
 
@@ -142,7 +142,7 @@ cmake --build build --config Debug --target instance_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
+To run the completed example, run the CMake configuration command above, then build and run it with these commands.
 
 ```powershell
 cmake --build build --config Debug --target instance_completed
@@ -159,7 +159,7 @@ cmake --build build --target instance_example
 ./build/main
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
+To run the completed example, run the CMake configuration command above, then build and run it with these commands.
 
 ```sh
 cmake --build build --target instance_completed

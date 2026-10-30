@@ -4,7 +4,7 @@
 
 After initializing the Vulkan library through an instance, select a physical device for computation. A computer may have multiple GPUs, and their supported features may differ. This tutorial uses the first device that supports Vulkan 1.3 and can process compute commands.
 
-Open [main.cpp](main.cpp) and work through the steps, starting with retrieving the device list. Once published, the completed code is available in `examples/99-completed/03-physical-devices.cpp`.
+Open [main.cpp](main.cpp) and work through the steps, starting with retrieving the device list. This lesson does not include a completed source file.
 
 ## Prepare to select a device
 
@@ -271,13 +271,6 @@ cmake --build build --config Debug --target physical_devices
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```powershell
-cmake --build build --config Debug --target physical_devices_completed
-.\build\completed\Debug\main.exe
-```
-
 ### Linux
 
 Build and run with Makefiles or Ninja.
@@ -286,13 +279,6 @@ Build and run with Makefiles or Ninja.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --target physical_devices
 ./build/main
-```
-
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```sh
-cmake --build build --target physical_devices_completed
-./build/completed/main
 ```
 
 ### Expected output

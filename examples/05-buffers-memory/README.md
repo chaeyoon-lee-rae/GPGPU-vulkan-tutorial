@@ -6,7 +6,7 @@ With the logical device and queue ready, prepare the data for computation. In Vu
 
 Create two input buffers and one output buffer. Write values to each buffer from the CPU, then read them back to verify them. Later lessons use the GPU to compute with these values.
 
-Open [main.cpp](main.cpp) and follow the steps below. Once published, the completed code is available in `examples/99-completed/05-buffers-memory.cpp`.
+Open [main.cpp](main.cpp) and follow the steps below. This lesson does not include a completed source file.
 
 ## Set the buffer size and add storage members
 
@@ -386,13 +386,6 @@ cmake --build build --config Debug --target buffers_memory_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```powershell
-cmake --build build --config Debug --target buffers_memory_completed
-.\build\completed\Debug\main.exe
-```
-
 ### Linux
 
 Build and run with Makefiles or Ninja.
@@ -401,13 +394,6 @@ Build and run with Makefiles or Ninja.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --target buffers_memory_example
 ./build/main
-```
-
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```sh
-cmake --build build --target buffers_memory_completed
-./build/completed/main
 ```
 
 ### Expected output

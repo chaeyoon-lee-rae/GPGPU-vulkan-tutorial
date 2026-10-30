@@ -6,7 +6,7 @@ The previous lesson defined a layout with one storage buffer at each of bindings
 
 Descriptor sets are allocated from a descriptor pool. First provide the pool with enough capacity, then allocate the set and write the buffer information into it.
 
-Open [main.cpp](main.cpp) and add these steps after the previous lesson's layout creation. Once published, the completed code is available in `examples/99-completed/07-descriptor-sets.cpp`.
+Open [main.cpp](main.cpp) and add these steps after the previous lesson's layout creation. This lesson does not include a completed source file.
 
 ## Add members to hold the pool and sets
 
@@ -287,13 +287,6 @@ cmake --build build --config Debug --target descriptor_sets_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```powershell
-cmake --build build --config Debug --target descriptor_sets_completed
-.\build\completed\Debug\main.exe
-```
-
 ### Linux
 
 Build and run with Makefiles or Ninja.
@@ -302,13 +295,6 @@ Build and run with Makefiles or Ninja.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --target descriptor_sets_example
 ./build/main
-```
-
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```sh
-cmake --build build --target descriptor_sets_completed
-./build/completed/main
 ```
 
 ### Expected output

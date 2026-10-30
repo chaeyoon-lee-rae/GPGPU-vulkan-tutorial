@@ -6,7 +6,7 @@ The previous lesson created buffers for two inputs and one output. How does the 
 
 Before connecting the buffers, specify the types and numbers of resources the shader will use. A descriptor set layout defines this structure. This lesson creates a layout for two inputs and one output.
 
-Open [main.cpp](main.cpp) and add the layout after the buffers from the previous lesson. Once published, the completed code is available in `examples/99-completed/06-descriptor-layout.cpp`.
+Open [main.cpp](main.cpp) and add the layout after the buffers from the previous lesson. This lesson does not include a completed source file.
 
 ## Add a member to hold the layout
 
@@ -123,13 +123,6 @@ cmake --build build --config Debug --target descriptor_layout_example
 .\build\Debug\main.exe
 ```
 
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```powershell
-cmake --build build --config Debug --target descriptor_layout_completed
-.\build\completed\Debug\main.exe
-```
-
 ### Linux
 
 Build and run with Makefiles or Ninja.
@@ -138,13 +131,6 @@ Build and run with Makefiles or Ninja.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --target descriptor_layout_example
 ./build/main
-```
-
-If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
-
-```sh
-cmake --build build --target descriptor_layout_completed
-./build/completed/main
 ```
 
 ### Expected output
