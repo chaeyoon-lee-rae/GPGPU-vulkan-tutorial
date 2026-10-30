@@ -1,18 +1,18 @@
-# 08. 컴퓨트 셰이더
+# 08. Compute shader
 
-[이전: 디스크립터 풀과 셋](../07-descriptor-sets/README.md) · [다음: 컴퓨트 파이프라인](../09-compute-pipeline/README.md) · [전체 튜토리얼](../../README.md#튜토리얼)
+[Previous: Descriptor pools and sets](../07-descriptor-sets/README.md) | [Next: Compute pipeline](../09-compute-pipeline/README.md) | [All tutorials](../../README.md#tutorials)
 
-이전 장에서 입력 `inputA`, `inputB`와 출력 `output`을 디스크립터 셋에 연결했습니다. 이번에는 각 원소를 더하는 컴퓨트 셰이더(Compute shader)를 작성하고, C++에서 사용할 셰이더 모듈(Shader module)을 만들겠습니다.
+The previous lesson connected inputs `inputA` and `inputB` and output `output` to a descriptor set. This lesson writes a compute shader that adds corresponding elements and creates a shader module for use in C++.
 
-셰이더는 GLSL로 작성하고, 빌드할 때 SPIR-V 바이너리로 변환합니다. C++ 프로그램은 이 바이너리를 읽어 Vulkan에 전달합니다. 이번 장의 완료 지점은 모듈 생성이며, GPU 연산은 이후 명령을 기록하고 제출하는 장에서 실행합니다.
+The shader is written in GLSL and converted to a SPIR-V binary during the build. The C++ program reads this binary and passes it to Vulkan. This lesson ends at module creation; GPU computation runs in later lessons that record and submit commands.
 
-[add.comp](add.comp)와 [main.cpp](main.cpp)를 엽니다. 셰이더 파일은 완성된 형태로 제공되므로 먼저 선언과 계산을 살펴봅니다. `main.cpp`에는 07장까지의 코드가 들어 있습니다. 완성된 코드는 공개 후 `examples/99-completed/08-compute-shader.cpp`에서 확인할 수 있습니다.
+Open [add.comp](add.comp) and [main.cpp](main.cpp). The shader file is provided in its completed form, so first examine its declarations and calculation. `main.cpp` contains the code through lesson 07. Once published, the completed code is available in `examples/99-completed/08-compute-shader.cpp`.
 
-## 한 번의 셰이더 실행이 맡을 일
+## Assign work to each shader invocation
 
-CPU에서 배열을 더한다면 반복문으로 `output[i] = inputA[i] + inputB[i]`를 계산할 수 있습니다. 각 원소의 계산이 서로 독립적이므로, GPU에서는 같은 코드를 여러 원소에 병렬로 적용합니다. 이 실행 하나를 인보케이션(Invocation), 인보케이션의 묶음을 워크그룹(Workgroup)이라고 하며, CUDA의 스레드(thread)와 블록(block)에 각각 대응합니다.
+On the CPU, array addition can use a loop to calculate `output[i] = inputA[i] + inputB[i]`. Each element's calculation is independent, so the GPU applies the same code to many elements in parallel. Each execution is an invocation, and a group of invocations is a workgroup. These correspond to CUDA threads and blocks, respectively.
 
-`add.comp`의 맨 위에 있는 다음 선언부터 확인합니다.
+Start with the following declarations at the top of `add.comp`.
 
 ```glsl
 #version 450
@@ -20,16 +20,16 @@ CPU에서 배열을 더한다면 반복문으로 `output[i] = inputA[i] + inputB
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 ```
 
-워크그룹 하나에 X축 방향으로 인보케이션 64개를 배치합니다. 그룹 크기를 고정하고 입력 크기에 따라 그룹 수를 늘리면 같은 셰이더로 더 큰 배열도 처리할 수 있습니다. 실행할 그룹 수는 [10장 커맨드 버퍼](../10-command-buffers/README.md)에서 정하며, `elementCount = 8`일 때는 한 그룹의 64개 중 8개만 계산하도록 범위를 검사합니다. `64`는 실습용 선택이며 모든 GPU에서 최적인 크기를 뜻하지는 않습니다.
+Each workgroup has 64 invocations along the x axis. Keeping the group size fixed and increasing the group count with the input size lets the same shader process larger arrays. [Lesson 10: Command buffers](../10-command-buffers/README.md) sets the number of groups to execute. When `elementCount = 8`, a bounds check allows only 8 of the group's 64 invocations to perform the calculation. `64` is a choice for this exercise, not an optimal size for every GPU.
 
 > [!NOTE]
-> **생각해볼 점**
+> **Questions to consider**
 >
-> 인보케이션, 워크그룹, 디스패치는 각각 무엇이며 CUDA의 어떤 개념과 대응하나요?
+> What are invocations, workgroups, and dispatches, and which CUDA concepts do they correspond to?
 
-## 디스크립터 바인딩에 맞춰 버퍼 선언하기
+## Declare buffers to match the descriptor bindings
 
-워크그룹 선언 아래에서 첫 입력을 정의합니다.
+Below the workgroup declaration, define the first input.
 
 ```glsl
 layout(set = 0, binding = 0, std430) readonly buffer InputA
@@ -38,13 +38,13 @@ layout(set = 0, binding = 0, std430) readonly buffer InputA
 } inputA;
 ```
 
-`set = 0`은 사용할 디스크립터 셋 번호, `binding = 0`은 그 셋 안의 바인딩 번호입니다. 07장에서 `inputA.buffer`를 연결한 바인딩과 일치합니다. `buffer`는 스토리지 버퍼에 접근하는 블록을 선언하고, 그 안의 `float values[]`는 연결된 바이트들을 `float` 배열로 해석하는 방법을 정합니다. 실제 메모리는 C++에서 이미 할당했습니다.
+`set = 0` selects the descriptor set number, and `binding = 0` selects the binding within that set. This matches the binding connected to `inputA.buffer` in lesson 07. `buffer` declares a block that accesses a storage buffer. Its `float values[]` member specifies how to interpret the bound bytes as a `float` array. The actual memory was already allocated in C++.
 
-`readonly`는 이 변수를 통한 쓰기를 컴파일 오류로 막아 입력을 실수로 덮어쓰지 않게 합니다. 컴파일러에 접근 의도를 알리지만, 붙이는 것만으로 성능 향상을 보장하지는 않습니다. 출력의 `writeonly`도 같은 이유로 읽기를 금지합니다. [GLSL 메모리 한정자](https://docs.vulkan.org/glsl/latest/chapters/variables.html#memory-qualifiers)
+`readonly` makes writes through this variable a compile error, preventing accidental overwrites of the input. It communicates the intended access to the compiler but does not guarantee a performance gain. For the same reason, `writeonly` on the output prohibits reads. See [GLSL memory qualifiers](https://docs.vulkan.org/glsl/latest/chapters/variables.html#memory-qualifiers).
 
-`std430`은 메모리 정렬(alignment)과 배열 원소 간격(stride)을 포함한 배치 규칙입니다. 이 규칙에서 `float` 배열의 간격은 4바이트여서 C++의 연속 배열과 맞습니다(`std140`에서는 16바이트). CPU와 셰이더가 간격을 다르게 해석하면 같은 인덱스로 다른 바이트를 읽으므로, 구조체나 벡터를 넣을 때도 정렬·패딩을 맞춰야 합니다. [셰이더 메모리 레이아웃](https://docs.vulkan.org/guide/latest/shader_memory_layout.html)
+`std430` defines memory layout rules, including alignment and array element stride. Under these rules, a `float` array has a 4-byte stride, matching a contiguous C++ array (`std140` uses 16 bytes). If the CPU and shader interpret the stride differently, the same index accesses different bytes. Alignment and padding must also match when using structures or vectors. See [Shader memory layout](https://docs.vulkan.org/guide/latest/shader_memory_layout.html).
 
-그 아래의 두 번째 입력과 출력도 같은 구조입니다.
+The second input and output below it use the same structure.
 
 ```glsl
 layout(set = 0, binding = 1, std430) readonly buffer InputB
@@ -58,19 +58,19 @@ layout(set = 0, binding = 2, std430) writeonly buffer Output
 } resultBuffer;
 ```
 
-세 블록은 다음과 같이 앞 장의 C++ 코드에 대응합니다. GLSL 변수 이름이 C++ 변수와 같아서 연결되는 것이 아니라, 셋·바인딩 번호로 연결됩니다.
+The three blocks correspond to the previous lesson's C++ code as follows. They are connected by set and binding numbers, not by matching GLSL and C++ variable names.
 
-| 셋 | 바인딩 | C++에서 연결한 버퍼 | 셰이더 접근 |
+| Set | Binding | Buffer connected in C++ | Shader access |
 |---|---|---|---|
-| 0 | 0 | `inputA.buffer` | `inputA.values[index]` 읽기 |
-| 0 | 1 | `inputB.buffer` | `inputB.values[index]` 읽기 |
-| 0 | 2 | `output.buffer` | `resultBuffer.values[index]` 쓰기 |
+| 0 | 0 | `inputA.buffer` | Read `inputA.values[index]` |
+| 0 | 1 | `inputB.buffer` | Read `inputB.values[index]` |
+| 0 | 2 | `output.buffer` | Write `resultBuffer.values[index]` |
 
-`values[]`는 스토리지 블록의 마지막 멤버에 사용할 수 있는 GLSL의 런타임 크기 배열입니다. 길이를 소스에 고정하지 않아 버퍼 크기가 달라져도 셰이더를 다시 컴파일할 필요가 없습니다. 이 예제에서 디스크립터에 32바이트를 연결하면 `float` 8개만 접근할 수 있으며, `[]`가 공간을 늘려 주지는 않습니다.
+`values[]` is a GLSL runtime-sized array that can be the last member of a storage block. Since its length is not fixed in the source, changing the buffer size does not require recompiling the shader. In this example, a descriptor covering 32 bytes permits access to only eight `float` values; `[]` does not expand the storage.
 
-## 실제 원소 수 받기
+## Receive the actual element count
 
-버퍼 선언 아래에는 원소 수를 받는 푸시 상수(Push constant)가 있습니다.
+Below the buffer declarations, a push constant receives the element count.
 
 ```glsl
 layout(push_constant) uniform Parameters
@@ -79,13 +79,13 @@ layout(push_constant) uniform Parameters
 } params;
 ```
 
-푸시 상수는 원소 수처럼 작은 값을 커맨드 버퍼에 기록해 셰이더에 전달하는 방법입니다. 4바이트의 `count`를 위해 별도 버퍼와 디스크립터를 관리할 필요가 없어 여기서 사용합니다. C++에서는 32비트 부호 없는 정수인 `uint32_t`로 맞추겠습니다.
+Push constants pass small values, such as an element count, to a shader by recording them in a command buffer. They are used here to avoid managing a separate buffer and descriptor for the 4-byte `count`. The C++ side will use the matching 32-bit unsigned integer type, `uint32_t`.
 
-이 선언만으로 `count`에 8이 들어가지는 않습니다. 09장에서 이 값의 크기와 셰이더 접근 범위를 파이프라인 레이아웃에 정의하고, 10장에서 실제 값을 기록합니다.
+This declaration alone does not set `count` to 8. Lesson 09 defines the size and shader stage access for this value in the pipeline layout, and lesson 10 records its actual value.
 
-## 인덱스를 구하고 범위 검사하기
+## Calculate the index and check bounds
 
-파일 끝의 `main()`이 셰이더의 진입 함수입니다.
+The `main()` function at the end of the file is the shader entry point.
 
 ```glsl
 void main()
@@ -100,43 +100,43 @@ void main()
 }
 ```
 
-`gl_LocalInvocationID.x`는 **그룹 안의 번호**여서 모든 그룹에서 0~63입니다. `gl_GlobalInvocationID.x`는 **전체 디스패치 안의 번호**로, `gl_WorkGroupID.x * 64 + gl_LocalInvocationID.x`입니다. 따라서 두 번째 그룹의 로컬 번호 0은 글로벌 번호 64에 해당합니다. 배열 인덱스에 로컬 번호만 쓰면 모든 그룹이 같은 0~63번 원소를 처리하므로 여기서는 글로벌 번호를 사용합니다.
+`gl_LocalInvocationID.x` is the **index within a group**, ranging from 0 to 63 in every group. `gl_GlobalInvocationID.x` is the **index within the entire dispatch**, equal to `gl_WorkGroupID.x * 64 + gl_LocalInvocationID.x`. Local index 0 in the second group therefore has global index 64. Using only the local index for array access would make every group process elements 0 through 63, so this shader uses the global index.
 
-범위 검사는 버퍼를 읽기 전에 수행합니다. `count = 8`이면 0~7번만 덧셈을 하고 나머지는 종료합니다. 각 인보케이션이 서로 다른 출력 원소에 쓰고 다른 인보케이션의 계산 결과를 읽지 않으므로, 이 셰이더 안에서는 인보케이션 사이의 동기화가 필요하지 않습니다.
+The bounds check runs before any buffer read. When `count = 8`, only indices 0 through 7 perform addition; the rest return. Each invocation writes a different output element and does not read other invocations' results, so synchronization between invocations is not needed within this shader.
 
-## GLSL을 SPIR-V로 빌드하기
+## Build GLSL into SPIR-V
 
-SPIR-V는 GPU 제조사에 독립적인 중간 표현(IR)입니다. GLSL을 공통 바이너리로 변환해 전달하고, 드라이버가 이를 해당 GPU의 실행 코드로 변환하므로 소스 언어 처리와 장치별 컴파일을 분리할 수 있습니다. 같은 SPIR-V를 사용해도 장치가 해당 기능을 지원해야 하며, 성능까지 같아지는 것은 아닙니다. [SPIR-V 소개](https://docs.vulkan.org/guide/latest/what_is_spirv.html)
+SPIR-V is a GPU-vendor-independent intermediate representation (IR). GLSL is converted to a common binary format, and the driver converts it to executable code for the target GPU. This separates source-language processing from device-specific compilation. Even with the same SPIR-V, the device must support its features, and performance can differ. See [What is SPIR-V?](https://docs.vulkan.org/guide/latest/what_is_spirv.html).
 
-00장에서 설치한 `glslc`가 GLSL을 SPIR-V로 변환합니다. 이 장의 [CMakeLists.txt](CMakeLists.txt)에는 셰이더 빌드 규칙이 준비돼 있습니다. 예제를 빌드하면 `add.comp`의 변경을 확인해 `build/add.comp.spv`를 생성합니다.
+The `glslc` installed in lesson 00 converts GLSL to SPIR-V. This lesson's [CMakeLists.txt](CMakeLists.txt) already contains the shader build rule. Building the example checks for changes to `add.comp` and generates `build/add.comp.spv`.
 
-컴파일 명령에 사용하는 옵션은 다음과 같습니다.
+The compiler command uses these options.
 
 ```sh
 glslc --target-env=vulkan1.3 --target-spv=spv1.3 add.comp -o build/add.comp.spv
 ```
 
-CMake 빌드가 위 컴파일 명령을 자동으로 실행합니다.
+The CMake build runs this compiler command automatically.
 
-CMake는 생성한 바이너리의 절대 경로를 `ADD_SHADER_PATH`라는 C++ 컴파일 정의로 전달합니다. 실행 프로그램은 이 경로를 사용하므로 터미널의 작업 디렉터리를 기준으로 셰이더 파일을 찾지 않습니다. 빌드 폴더를 다른 곳으로 옮겼다면 새 경로에서 CMake를 다시 구성하고 빌드합니다.
+CMake passes the generated binary's absolute path as the C++ compile definition `ADD_SHADER_PATH`. The executable uses this path instead of looking for the shader relative to the terminal's working directory. If the build directory is moved, reconfigure CMake and rebuild at the new location.
 
-## C++에서 셰이더 모듈 만들기
+## Create a shader module in C++
 
-셰이더 모듈은 SPIR-V 코드와 그 안의 진입 함수를 담는 Vulkan 객체입니다. 다음 장에서는 이 모듈에서 실행할 함수를 고르고 리소스 인터페이스를 연결해 파이프라인을 만듭니다. 모듈 자체는 버퍼 연결이나 실행 명령을 포함하지 않습니다. [VkShaderModule](https://docs.vulkan.org/refpages/latest/refpages/source/VkShaderModule.html)
+A shader module is a Vulkan object containing SPIR-V code and its entry points. The next lesson selects an entry point from this module and connects the resource interface to create a pipeline. The module itself does not contain buffer bindings or execution commands. See [VkShaderModule](https://docs.vulkan.org/refpages/latest/refpages/source/VkShaderModule.html).
 
-이제 [main.cpp](main.cpp)로 돌아갑니다. 파일 위쪽의 헤더 목록에 파일 입력을 위한 헤더를 추가합니다. `<vector>`와 `<stdint.h>`는 앞 장 코드에 이미 있습니다.
+Return to [main.cpp](main.cpp). Add the file input header to the headers at the top. `<vector>` and `<stdint.h>` are already included in the preceding lesson's code.
 
 ```cpp
 #include <fstream>
 ```
 
-`private` 영역의 `descriptorSets` 멤버 바로 아래에 셰이더 모듈을 보관할 자리를 추가합니다.
+In the `private` section, add a member to hold the shader module directly below `descriptorSets`.
 
 ```cpp
 vk::raii::ShaderModule shaderModule = nullptr;
 ```
 
-클래스의 `private` 영역 끝에 다음 함수의 틀을 추가합니다.
+Add this empty function at the end of the class's `private` section.
 
 ```cpp
 bool createShaderModule()
@@ -144,13 +144,13 @@ bool createShaderModule()
 }
 ```
 
-함수 안에서 CMake가 지정한 파일을 바이너리 모드로 엽니다. `std::ios::ate`는 파일을 연 뒤 읽기 위치를 끝으로 옮기므로 파일 크기를 확인할 수 있습니다.
+Inside the function, open the file specified by CMake in binary mode. `std::ios::ate` moves the read position to the end after opening the file, allowing its size to be determined.
 
 ```cpp
 std::ifstream file(ADD_SHADER_PATH, std::ios::ate | std::ios::binary);
 ```
 
-파일 열기에 실패하면 사용한 경로를 출력하고 초기화를 중단합니다. 파일을 여는 코드 바로 아래에 추가합니다.
+If opening fails, print the path used and stop initialization. Add this directly below the file opening code.
 
 ```cpp
 if (!file)
@@ -160,7 +160,7 @@ if (!file)
 }
 ```
 
-이어서 파일 끝의 위치로 바이트 크기를 얻고 검사합니다.
+Next, obtain the byte size from the position at the end of the file and check it.
 
 ```cpp
 const std::streamsize byteCount = file.tellg();
@@ -171,20 +171,20 @@ if (byteCount <= 0 || byteCount % sizeof(uint32_t) != 0)
 }
 ```
 
-SPIR-V는 32비트 워드로 구성되므로 크기가 0보다 큰 4바이트 배수여야 합니다. 이 검사는 빈 파일이나 잘못된 길이를 걸러내며, 파일 내용 전체가 유효한 SPIR-V인지를 검사하는 것은 아닙니다.
+SPIR-V consists of 32-bit words, so the size must be a positive multiple of 4 bytes. This check rejects empty files and invalid lengths; it does not validate the entire file as SPIR-V.
 
-## 바이너리를 32비트 배열로 읽기
+## Read the binary into a 32-bit array
 
-같은 함수에 바이너리를 담을 배열을 추가합니다. `byteCount`는 바이트 수이므로 `sizeof(uint32_t)`로 나눠 원소 수를 정합니다.
+In the same function, add an array to hold the binary. `byteCount` is in bytes, so divide by `sizeof(uint32_t)` to obtain the element count.
 
 ```cpp
 std::vector<uint32_t> code(static_cast<size_t>(byteCount) / sizeof(uint32_t));
 file.seekg(0);
 ```
 
-`std::vector<uint32_t>`를 사용하면 뒤에서 Vulkan에 전달할 포인터의 타입과 정렬을 맞출 수 있습니다. 파일 끝에서 크기를 읽었으므로 `seekg(0)`으로 다시 처음으로 이동합니다.
+Using `std::vector<uint32_t>` provides the pointer type and alignment required by Vulkan. Since the size was read at the end of the file, return to the beginning with `seekg(0)`.
 
-이어서 전체 바이트를 읽습니다.
+Next, read all the bytes.
 
 ```cpp
 if (!file.read(reinterpret_cast<char*>(code.data()), byteCount))
@@ -194,13 +194,13 @@ if (!file.read(reinterpret_cast<char*>(code.data()), byteCount))
 }
 ```
 
-`read()`는 바이트를 받을 `char*`를 요구하므로 여기서만 포인터를 변환합니다. 저장 공간 자체는 32비트 정수 배열이며, 읽기 실패 시 불완전한 데이터를 Vulkan에 전달하지 않습니다.
+`read()` requires a `char*` destination, so convert the pointer only for this call. The storage remains an array of 32-bit integers. If reading fails, incomplete data is not passed to Vulkan.
 
-eva의 [`SpvBlob::readFrom()`](https://github.com/vaistrata/eva/blob/2a31c83cc83eac7d4b74f4d9c9d4f6f0752c6f99/src/eva-runtime.cpp#L71-L85)도 `uint32_t[]`에 파일을 읽고 바이트 크기를 따로 보관합니다. 여기서도 같은 방식을 쓰되, `std::vector`와 C++ 파일 스트림을 사용하고 열기·크기·읽기 실패 검사를 추가했습니다.
+eva's [`SpvBlob::readFrom()`](https://github.com/vaistrata/eva/blob/2a31c83cc83eac7d4b74f4d9c9d4f6f0752c6f99/src/eva-runtime.cpp#L71-L85) also reads the file into `uint32_t[]` and stores the byte size separately. This example uses the same approach with `std::vector` and a C++ file stream, adding checks for opening, size, and read failures.
 
-## SPIR-V를 모듈에 전달하기
+## Pass SPIR-V to the module
 
-바이너리 읽기가 끝난 아래에 모듈 생성 정보를 추가합니다.
+After reading the binary, add the module creation information.
 
 ```cpp
 vk::ShaderModuleCreateInfo moduleInfo{};
@@ -208,9 +208,9 @@ moduleInfo.codeSize = static_cast<size_t>(byteCount);
 moduleInfo.pCode = code.data();
 ```
 
-`pCode`는 32비트 워드 배열을 가리키지만 `codeSize`의 단위는 바이트입니다. 여기에 `code.size()`를 그대로 넣으면 크기가 네 배 작아집니다.
+`pCode` points to an array of 32-bit words, but `codeSize` is measured in bytes. Using `code.size()` directly would make the size four times too small.
 
-다음으로 모듈을 생성하고 결과를 출력합니다.
+Next, create the module and print the result.
 
 ```cpp
 shaderModule = vk::raii::ShaderModule(device, moduleInfo); // C API: vkCreateShaderModule
@@ -218,22 +218,22 @@ std::cout << "Shader module created: " << moduleInfo.codeSize << " bytes.\n";
 return true;
 ```
 
-모듈 생성이 끝나면 지역 배열 `code`는 소멸해도 됩니다. 모듈은 멤버에 남아 다음 장의 파이프라인 생성에 사용됩니다.
+The local `code` array can be destroyed after module creation. The module remains in the member for pipeline creation in the next lesson.
 
-## 초기화 순서에 연결하기
+## Connect the initialization steps
 
-`initVulkan()` 끝의 `&& createDescriptorSets();` 한 줄을 다음 두 줄로 바꿉니다.
+Replace the final `&& createDescriptorSets();` line in `initVulkan()` with these two lines.
 
 ```cpp
     && createDescriptorSets()
     && createShaderModule();
 ```
 
-디스크립터 셋까지 준비한 뒤 SPIR-V를 읽고 모듈을 생성합니다. 다음 장에서는 이 모듈과 셰이더의 리소스 구조를 묶어 컴퓨트 파이프라인을 만들겠습니다.
+After preparing the descriptor set, read the SPIR-V and create the module. The next lesson combines this module with the shader's resource structure to create a compute pipeline.
 
-## 빌드와 실행
+## Build and run
 
-[환경 설정](../00-env-settings/README.md)을 마친 뒤, 저장소 루트에서 예제 폴더로 이동합니다.
+After completing [Environment settings](../00-env-settings/README.md), change from the repository root to the example directory.
 
 ```sh
 cd examples/08-compute-shader
@@ -241,7 +241,7 @@ cd examples/08-compute-shader
 
 ### Windows
 
-Visual Studio 생성기를 기준으로 빌드하고 실행합니다.
+Build and run with the Visual Studio generator.
 
 ```powershell
 cmake -S . -B build
@@ -249,7 +249,7 @@ cmake --build build --config Debug --target compute_shader_example
 .\build\Debug\main.exe
 ```
 
-완성본이 있다면 같은 구성에서 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, build and run it with these commands in the same configuration.
 
 ```powershell
 cmake --build build --config Debug --target compute_shader_completed
@@ -258,7 +258,7 @@ cmake --build build --config Debug --target compute_shader_completed
 
 ### Linux
 
-Makefiles 또는 Ninja를 기준으로 빌드하고 실행합니다.
+Build and run with Makefiles or Ninja.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -266,19 +266,19 @@ cmake --build build --target compute_shader_example
 ./build/main
 ```
 
-완성본이 있다면 같은 구성에서 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, build and run it with these commands in the same configuration.
 
 ```sh
 cmake --build build --target compute_shader_completed
 ./build/completed/main
 ```
 
-### 실행 결과
+### Expected output
 
-셰이더 모듈 생성 메시지와 SPIR-V의 바이트 크기가 출력되고 검증 레이어 오류가 없는지 확인합니다. 바이너리 크기는 컴파일러에 따라 달라질 수 있습니다. `build/add.comp.spv`가 존재하고 크기가 0보다 큰지도 확인합니다.
+Check that the shader module creation message and SPIR-V byte size appear without validation layer errors. The binary size may vary with the compiler. Also check that `build/add.comp.spv` exists and has a size greater than zero.
 
-출력 버퍼의 덧셈 결과는 아직 확인하지 않습니다. 모듈을 만들기만 했으므로 GPU는 셰이더를 실행하지 않았습니다. 이 장의 코드를 완성한 뒤, 실행 결과가 보이도록 터미널을 캡처해 제출합니다.
+Do not check the addition result in the output buffer yet. Only the module has been created; the GPU has not run the shader. After completing the code for this lesson, submit a screenshot of the terminal showing the output.
 
 ---
 
-참고: [GLSL 변수·타입과 메모리 배치](https://docs.vulkan.org/glsl/latest/chapters/variables.html), [Vulkan Guide: Push Constants](https://docs.vulkan.org/guide/latest/push_constants.html), [VkShaderModuleCreateInfo](https://docs.vulkan.org/refpages/latest/refpages/source/VkShaderModuleCreateInfo.html), [glslc 옵션](https://github.com/google/shaderc/blob/main/glslc/README.asciidoc).
+References: [GLSL variables, types, and memory layout](https://docs.vulkan.org/glsl/latest/chapters/variables.html), [Vulkan Guide: Push Constants](https://docs.vulkan.org/guide/latest/push_constants.html), [VkShaderModuleCreateInfo](https://docs.vulkan.org/refpages/latest/refpages/source/VkShaderModuleCreateInfo.html), [glslc options](https://github.com/google/shaderc/blob/main/glslc/README.asciidoc).

@@ -1,69 +1,31 @@
-# Cross-Platform-AI
+# GPGPU Vulkan Tutorial
 
-Vulkan 기반 GPU 추론의 동작 원리를 코드로 살펴보는 문서·예제 프로젝트입니다. GPU에 데이터를 전달하고 컴퓨트 셰이더를 실행하는 기초부터, llama.cpp의 Vulkan 백엔드 분석, vAi를 이용한 커널 구현·최적화와 모델 실행까지 다룹니다.
+A step-by-step introduction to general-purpose GPU computing (GPGPU) with Vulkan, C++, and GLSL. The exercises build a vector addition program, then add staging buffers and multiple dispatches while checking results against CPU reference values.
 
-서로 다른 GPU에서 같은 추론 코드를 실행하며 재사용할 수 있는 부분과 장치별로 조정해야 하는 부분을 확인합니다. 직접 연산을 수정하고 계산 결과와 실행 시간의 변화를 재현할 수 있는 자료를 만드는 것이 목표입니다.
+## Tutorials
 
-## 튜토리얼
+The examples use Vulkan-Hpp's `vk::raii`. Comments name C API functions only where a call has a one-to-one correspondence with them.
+Starting with lesson 01, open each lesson's `main.cpp` and fill it in by following the code blocks in its README. Completed examples are collected in `examples/99-completed/` and published separately.
+Each example builds independently with CMake from its own directory. Follow the build commands in the corresponding lesson.
 
-예제는 Vulkan-Hpp의 `vk::raii`를 사용합니다. C API 함수와 1:1로 대응하는 호출에만 함수명을 주석으로 표기합니다.
-01장부터는 각 장의 `main.cpp`를 열고 README의 코드 블록을 따라 채워 나갑니다. 완성본은 `examples/99-completed/`에 모아 별도로 공개합니다.
-각 예제는 해당 폴더에서 CMake로 독립적으로 빌드합니다. 빌드 명령은 각 장의 문서를 따릅니다.
+1. [00. Environment settings](examples/00-env-settings/README.md): Install development tools, query Vulkan devices, and check the C++ build and shader compilation.
+2. [01. Create and destroy an instance](examples/01-instance/README.md): Select the API version, query instance extensions, and use RAII for creation and destruction.
+3. [02. Validation layers](examples/02-validation-layers/README.md): Enable validation layers and use a debug messenger to receive diagnostic messages.
+4. [03. Physical devices and queue families](examples/03-physical-devices/README.md): Query device features and limits, then select a GPU and compute queue family.
+5. [04. Logical device and queues](examples/04-logical-device/README.md): Create a logical device, specify the features to use, and prepare a compute queue.
+6. [05. Buffers and memory](examples/05-buffers-memory/README.md): Select memory types, allocate, bind, and map memory, and write data from the CPU.
+7. [06. Descriptor set layout](examples/06-descriptor-layout/README.md): Specify resource types, counts, and shader stages for each binding, then create the layout.
+8. [07. Descriptor pools and sets](examples/07-descriptor-sets/README.md): Create a pool, allocate and update sets, and connect input and output buffers.
+9. [08. Compute shader](examples/08-compute-shader/README.md): Examine GLSL vector addition, workgroups, and bounds checks, then load SPIR-V and create a shader module.
+10. [09. Compute pipeline](examples/09-compute-pipeline/README.md): Define a pipeline layout and push constant range, then create a compute pipeline.
+11. [10. Command buffers](examples/10-command-buffers/README.md): Allocate a command buffer, bind the pipeline and descriptors, set push constants, and record a dispatch.
+12. [11. Dispatch and synchronization](examples/11-dispatch-synchronization/README.md): Submit to a queue, use barriers and fences, verify against CPU reference values, and run again with different inputs.
+13. [12. Staging buffers](examples/12-staging-buffers/README.md): Separate transfer and compute buffers, copy data, and synchronize transfers with computation.
+14. [13. Multiple dispatches](examples/13-multiple-dispatches/README.md): Use an intermediate buffer and two descriptor sets, synchronize compute operations, and verify consecutive calculations.
 
-1. [00. 환경 설정](examples/00-env-settings/README.md) · [English](examples/00-env-settings/README-en.md) — 개발 도구 설치, Vulkan 장치 조회, C++ 빌드와 셰이더 컴파일 확인
-2. [01. 인스턴스 생성과 해제](examples/01-instance/README.md) — API 버전, 인스턴스 확장 조회, RAII로 생성·해제
-3. [02. 검증 레이어](examples/02-validation-layers/README.md) — 검증 레이어 활성화, 디버그 메신저와 진단 메시지
-4. [03. 물리 디바이스와 큐 패밀리](examples/03-physical-devices/README.md) — 장치 기능·한계 조회, GPU와 컴퓨트 큐 패밀리 선택
-5. [04. 논리 디바이스와 큐](examples/04-logical-device/README.md) — 논리 디바이스 생성, 사용할 기능 지정, 컴퓨트 큐 준비
-6. [05. 버퍼와 메모리](examples/05-buffers-memory/README.md) — 메모리 타입 선택, 할당·바인딩·매핑, CPU 데이터 기록
-7. [06. 디스크립터 셋 레이아웃](examples/06-descriptor-layout/README.md) — 바인딩별 리소스 종류·개수·셰이더 단계, 레이아웃 생성
-8. [07. 디스크립터 풀과 셋](examples/07-descriptor-sets/README.md) — 풀 생성, 셋 할당·갱신, 입력·출력 버퍼 연결
-9. [08. 컴퓨트 셰이더](examples/08-compute-shader/README.md) — 벡터 덧셈 GLSL, 워크그룹과 범위 검사, SPIR-V 로드와 셰이더 모듈
-10. [09. 컴퓨트 파이프라인](examples/09-compute-pipeline/README.md) — 파이프라인 레이아웃, 푸시 상수 범위, 컴퓨트 파이프라인 생성
-11. [10. 커맨드 버퍼](examples/10-command-buffers/README.md) — 커맨드 버퍼 할당, 파이프라인·디스크립터·푸시 상수 바인딩, 디스패치 기록
-12. [11. 디스패치와 동기화](examples/11-dispatch-synchronization/README.md) — 큐 제출, 배리어와 펜스, CPU 정답 검증, 입력을 바꿔 재실행
-13. [12. 스테이징 버퍼](examples/12-staging-buffers/README.md) — 전송용·연산용 버퍼 분리, 복사와 전송 ↔ 컴퓨트 동기화
-14. [13. 연속 디스패치](examples/13-multiple-dispatches/README.md) — 중간 버퍼와 두 디스크립터 셋, 컴퓨트 → 컴퓨트 동기화, 연속 연산 검증
-
-11장까지는 첫 GPU 벡터 덧셈을 완성합니다. 12장은 데이터 전송을 분리하고, 13장은 GPU에 남아 있는 중간 결과를 다음 연산으로 연결합니다.
-
-## 다루는 내용
-
-### Vulkan 컴퓨트 기초
-
-디바이스와 큐, 버퍼와 메모리, 디스크립터를 이용한 리소스 연결부터 시작합니다. GLSL 셰이더를 SPIR-V로 컴파일하고 컴퓨트 파이프라인과 커맨드 버퍼로 실행하는 최소 예제를 통해 데이터 전달, 디스패치, 동기화, 결과 확인 과정을 설명합니다.
-
-### llama.cpp Vulkan 백엔드 분석
-
-llama.cpp의 실행 진입점에서 ggml을 거쳐 Vulkan 백엔드로 연산이 전달되는 경로를 추적합니다. 한 연산을 기준으로 셰이더 준비, 입력 형상에 따른 커널 선택, 파이프라인 생성·재사용, 리소스 연결, 명령 기록·제출을 살펴보고 prefill과 decode의 실행 흐름을 비교합니다.
-
-### vAi 커널 구현과 최적화
-
-그래프 DSL 기반 Vulkan 추론 엔진인 vAi의 Node·Tensor와 셰이더 실행 구조를 살펴보고 llama.cpp의 구현과 비교합니다. 커스텀 연산을 정의해 직접 작성한 셰이더를 연결하고, CPU 기준값으로 정확성을 검증합니다. 메모리 접근, 데이터 재사용, 워크그룹 구성을 바꾸며 최적화가 효과를 내는 조건과 한계를 측정합니다.
-
-### 모델 구성과 실행
-
-간단한 모델(예: GPT-2)의 가중치, 중간 텐서, 입출력을 연산 그래프로 연결합니다. 직접 작성한 연산을 모델에 적용하고 기본 커널과 개선한 커널의 계산 결과, 개별 커널 실행 시간, 모델 전체 실행 시간을 비교합니다.
-
-## 공개 로드맵
-
-| 단계 | 공개할 문서와 예제 |
-|---|---|
-| 1. Vulkan 기초 | 환경 구성·빌드 안내, 버퍼와 리소스 연결 설명, 컴퓨트 셰이더 실행 예제, 정확성 검사 |
-| 2. llama.cpp 분석 | 실행 경로 그림, 핵심 코드 위치, 커널 선택·파이프라인·명령 제출까지 이어지는 백엔드 탐색 가이드 |
-| 3. vAi 커널 구현 | 두 엔진의 구현 비교, 커스텀 연산 연결 예제, 기본 커널과 정확성 테스트 |
-| 4. 최적화 실험 | 기본·개선 커널, 측정 코드와 원자료, 입력 조건별 효과와 한계 |
-| 5. 모델 실행 | 모델 구성도, 가중치 준비·실행 안내, 입력부터 출력까지 동작하는 예제와 재현 결과 |
-
-실험 기록에는 GPU, 드라이버, 코드 버전, 입력 조건, 실행 방법을 함께 남깁니다. 정확성은 여러 입력 크기와 경계 조건에서 확인하고, 성능은 동일한 GPU와 입력 조건에서 반복 측정합니다. 성능이 개선되지 않은 실험도 함께 기록합니다.
-
-## Team
-
-TBD
+By the end of lesson 11, the first GPU vector addition is complete. Lesson 12 separates data transfers, and lesson 13 connects an intermediate result kept on the GPU to the next operation.
 
 ## Acknowledgement
-
-이 프로젝트는 가짜연구소 Open Academy로 진행됩니다. 여러분의 참여와 기여가 '우연한 혁명(Serendipity Revolution)'을 가능하게 합니다. 모두에게 깊은 감사를 전합니다.
 
 This project is developed as part of Pseudo-Lab's Open Research Initiative. Special thanks to our contributors and the open source community for their valuable insights and contributions.
 
@@ -75,4 +37,4 @@ Pseudo-Lab is a non-profit organization focused on advancing machine learning an
 
 [MIT](LICENSE)
 
-공식 튜토리얼을 번역·각색한 문서는 각 문서에 표기한 CC BY-SA 4.0을 따릅니다.
+Documents are licensed under CC BY-SA 4.0.

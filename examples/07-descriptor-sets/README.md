@@ -1,33 +1,33 @@
-# 07. 디스크립터 풀과 셋
+# 07. Descriptor pools and sets
 
-[이전: 디스크립터 셋 레이아웃](../06-descriptor-layout/README.md) · [다음: 컴퓨트 셰이더](../08-compute-shader/README.md) · [전체 튜토리얼](../../README.md#튜토리얼)
+[Previous: Descriptor set layout](../06-descriptor-layout/README.md) | [Next: Compute shader](../08-compute-shader/README.md) | [All tutorials](../../README.md#tutorials)
 
-이전 장에서는 0, 1, 2번 바인딩에 스토리지 버퍼가 하나씩 들어간다는 것을 레이아웃으로 정의했습니다. 이제 그 구조를 따르는 디스크립터 셋(Descriptor set)을 할당하고, 각 바인딩에 입력과 출력 버퍼를 연결하겠습니다.
+The previous lesson defined a layout with one storage buffer at each of bindings 0, 1, and 2. Now allocate a descriptor set with that structure and connect the input and output buffers to its bindings.
 
-디스크립터 셋은 디스크립터 풀(Descriptor pool)에서 할당받습니다. 먼저 풀에 필요한 용량을 마련하고, 셋을 할당한 뒤 버퍼 정보를 써 넣는 순서로 진행합니다.
+Descriptor sets are allocated from a descriptor pool. First provide the pool with enough capacity, then allocate the set and write the buffer information into it.
 
-[main.cpp](main.cpp)를 열고 이전 장의 레이아웃 생성 다음에 이 과정을 추가해 보겠습니다. 완성된 코드는 공개 후 `examples/99-completed/07-descriptor-sets.cpp`에서 확인할 수 있습니다.
+Open [main.cpp](main.cpp) and add these steps after the previous lesson's layout creation. Once published, the completed code is available in `examples/99-completed/07-descriptor-sets.cpp`.
 
-## 풀과 셋을 보관할 자리 만들기
+## Add members to hold the pool and sets
 
-할당받은 셋을 보관할 컨테이너로 `std::vector`를 사용하겠습니다. 파일 위쪽의 헤더 목록에 다음 줄을 추가합니다.
+Use `std::vector` to hold the allocated sets. Add this line to the headers at the top of the file.
 
 ```cpp
 #include <vector>
 ```
 
-그다음 `private` 영역의 `descriptorSetLayout` 멤버 바로 아래에 풀과 셋을 순서대로 선언합니다.
+In the `private` section, directly below `descriptorSetLayout`, declare the pool and sets in this order.
 
 ```cpp
 vk::raii::DescriptorPool descriptorPool = nullptr;
 std::vector<vk::raii::DescriptorSet> descriptorSets;
 ```
 
-RAII 멤버는 선언한 순서의 역순으로 소멸합니다. 셋을 풀 뒤에 선언하면, 셋이 자신을 해제할 때 풀이 아직 남아 있게 됩니다. 이번에는 셋을 하나만 할당하며 `descriptorSets[0]`으로 접근하겠습니다.
+RAII members are destroyed in reverse declaration order. Declaring the sets after the pool keeps the pool alive while the sets free themselves. This lesson allocates one set and accesses it through `descriptorSets[0]`.
 
-## 풀의 용량 정하기
+## Set the pool capacity
 
-풀은 할당할 셋과 디스크립터를 담을 용량이 필요합니다. 우선 클래스의 `private` 영역 끝에 풀 생성 함수의 틀을 만듭니다.
+The pool needs capacity for the sets and descriptors to allocate. First, add an empty pool creation function at the end of the class's `private` section.
 
 ```cpp
 bool createDescriptorPool()
@@ -35,7 +35,7 @@ bool createDescriptorPool()
 }
 ```
 
-함수 안에서 어떤 유형의 디스크립터를 몇 개 제공할지 정합니다. 입력 두 개와 출력 하나를 연결하므로 스토리지 버퍼 디스크립터 세 개를 준비합니다.
+Inside the function, specify the descriptor types and counts to provide. Prepare three storage buffer descriptors for two inputs and one output.
 
 ```cpp
 vk::DescriptorPoolSize poolSize{};
@@ -43,47 +43,47 @@ poolSize.type = vk::DescriptorType::eStorageBuffer;
 poolSize.descriptorCount = 3;
 ```
 
-이 값은 풀 전체에서 사용할 스토리지 버퍼 디스크립터의 용량입니다. 레이아웃에서는 바인딩마다 `descriptorCount`를 1로 지정했지만, 풀은 세 바인딩을 모두 수용해야 합니다.
+This is the storage buffer descriptor capacity of the entire pool. The layout set `descriptorCount` to 1 per binding, but the pool must accommodate all three bindings.
 
-이어서 풀의 생성 정보를 만듭니다. RAII 셋은 소멸할 때 자신을 개별적으로 해제하므로, 이를 허용하는 플래그를 넣습니다.
+Next, create the pool creation information. RAII sets free themselves individually on destruction, so set the flag that permits this.
 
 ```cpp
 vk::DescriptorPoolCreateInfo poolInfo{};
 poolInfo.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
 ```
 
-`eFreeDescriptorSet`이 지정된 풀에서는 할당받은 셋을 하나씩 해제할 수 있습니다. 다음으로 풀에서 할당할 셋의 최대 개수를 설정합니다.
+A pool with `eFreeDescriptorSet` allows allocated sets to be freed individually. Next, set the maximum number of sets that can be allocated from the pool.
 
 ```cpp
 poolInfo.maxSets = 1;
 ```
 
-세 디스크립터를 한 셋에 넣을 것이므로 셋은 하나면 됩니다. `maxSets`와 `poolSize.descriptorCount`는 각각 셋 개수와 특정 유형의 디스크립터 개수를 제한합니다.
+One set is enough because it will contain all three descriptors. `maxSets` limits the number of sets, while `poolSize.descriptorCount` limits the number of descriptors of a particular type.
 
-이제 앞에서 만든 유형별 용량 정보를 생성 정보에 연결합니다.
+Connect the descriptor capacity information prepared above to the creation information.
 
 ```cpp
 poolInfo.poolSizeCount = 1;
 poolInfo.pPoolSizes = &poolSize;
 ```
 
-`poolSizeCount`는 `pPoolSizes`로 전달하는 용량 정보의 개수입니다. 스토리지 버퍼라는 한 유형만 사용하므로 정보 하나의 주소를 전달합니다.
+`poolSizeCount` is the number of capacity entries passed through `pPoolSizes`. Only one type, storage buffer, is used, so pass the address of one entry.
 
-## 풀 생성하기
+## Create the pool
 
-생성 정보가 준비됐으니 논리 디바이스에서 풀을 만들겠습니다. 같은 함수에서 방금 작성한 코드 아래에 이어 붙입니다.
+With the creation information ready, create the pool on the logical device. Continue below the preceding code in the same function.
 
 ```cpp
 descriptorPool = vk::raii::DescriptorPool(device, poolInfo); // C API: vkCreateDescriptorPool
 ```
 
-생성한 풀은 멤버에 저장됩니다. 이제 다른 함수에서도 이 풀을 사용해 셋을 할당할 수 있습니다. 함수 끝에는 결과를 출력하고 성공을 반환합니다.
+The created pool is stored in the member. Other functions can now use it to allocate sets. At the end of the function, print the result and return success.
 
 ```cpp
 std::cout << "Descriptor pool created: max sets " << poolInfo.maxSets << '\n';
 ```
 
-유형별 디스크립터 용량은 생성 정보에 연결한 항목들을 순회하며 출력합니다. 용량 설정을 바꾸면 출력에도 같은 값이 반영됩니다.
+Print the descriptor capacity for each type by iterating over the entries connected to the creation information. Changes to the capacity settings will also appear in the output.
 
 ```cpp
 for (uint32_t i = 0; i < poolInfo.poolSizeCount; ++i)
@@ -95,9 +95,9 @@ for (uint32_t i = 0; i < poolInfo.poolSizeCount; ++i)
 return true;
 ```
 
-## 레이아웃을 사용해 셋 할당하기
+## Allocate a set using the layout
 
-이제 풀에서 셋을 할당받겠습니다. 방금 만든 함수 아래, 클래스가 끝나기 전에 다음 함수의 틀을 추가합니다.
+Allocate a set from the pool. Add this empty function below the one just written, before the end of the class.
 
 ```cpp
 bool createDescriptorSets()
@@ -105,41 +105,41 @@ bool createDescriptorSets()
 }
 ```
 
-셋을 할당할 때는 각 셋이 따를 레이아웃을 전달해야 합니다. 먼저 함수 안에서 이전 장에 만든 RAII 레이아웃의 Vulkan 핸들을 꺼냅니다.
+Allocation requires the layout for each set. First, retrieve the Vulkan handle from the RAII layout created in the previous lesson.
 
 ```cpp
 const vk::DescriptorSetLayout layout = *descriptorSetLayout;
 ```
 
-RAII 객체 앞의 `*`는 내부 핸들을 꺼냅니다. 이 핸들은 앞에서 정의한 세 스토리지 버퍼 바인딩의 구조를 가리킵니다.
+The `*` operator on an RAII object retrieves its underlying handle. This handle identifies the layout of the three storage buffer bindings defined earlier.
 
-할당 정보를 만들고 사용할 풀을 지정합니다. 여기도 RAII 객체 안의 풀 핸들을 전달합니다.
+Create the allocation information and specify the pool to use. Pass the underlying pool handle from the RAII object here as well.
 
 ```cpp
 vk::DescriptorSetAllocateInfo allocInfo{};
 allocInfo.descriptorPool = *descriptorPool;
 ```
 
-이어서 할당받을 셋의 개수와 레이아웃을 지정합니다. 셋이 하나이므로 레이아웃 핸들 하나의 주소를 전달하면 됩니다.
+Next, specify the number of sets to allocate and their layouts. There is one set, so pass the address of one layout handle.
 
 ```cpp
 allocInfo.descriptorSetCount = 1;
 allocInfo.pSetLayouts = &layout;
 ```
 
-`pSetLayouts`는 각 셋에 사용할 레이아웃 핸들의 배열을 가리킵니다. Vulkan은 이 정보를 보고 풀에서 필요한 디스크립터 용량을 사용합니다.
+`pSetLayouts` points to an array of layout handles, one for each set. Vulkan uses this information to consume the required descriptor capacity from the pool.
 
-이제 할당 함수를 호출하고 반환된 RAII 셋들을 멤버에 보관합니다.
+Call the allocation function and store the returned RAII sets in the member.
 
 ```cpp
 descriptorSets = device.allocateDescriptorSets(allocInfo); // C API: vkAllocateDescriptorSets
 ```
 
-할당은 끝났지만 아직 셋에 실제 버퍼 정보가 들어 있지는 않습니다. 이어서 0, 1, 2번 바인딩이 각각 어느 버퍼의 어느 영역을 참조할지 지정하겠습니다.
+Allocation is complete, but the set does not yet contain actual buffer information. Next, specify which buffer region each of bindings 0, 1, and 2 refers to.
 
-## 버퍼와 사용할 영역 지정하기
+## Specify the buffers and regions
 
-버퍼를 참조하는 디스크립터에는 버퍼 핸들, 시작 위치, 사용할 크기가 필요합니다. 이를 담는 `vk::DescriptorBufferInfo` 배열을 할당 코드 아래에 추가합니다.
+A descriptor that refers to a buffer needs the buffer handle, starting offset, and size of the region to use. Add an array of `vk::DescriptorBufferInfo` below the allocation code to hold this information.
 
 ```cpp
 std::array<vk::DescriptorBufferInfo, 3> bufferInfos{};
@@ -148,9 +148,9 @@ bufferInfos[1].buffer = *inputB.buffer;
 bufferInfos[2].buffer = *output.buffer;
 ```
 
-뒤에서 배열 인덱스를 바인딩 번호로 사용할 것이므로 0번에 `inputA`, 1번에 `inputB`, 2번에 `output`을 넣었습니다. 이 단계는 지역 배열을 채운 것으로, 아직 셋에 반영되지는 않았습니다.
+The array index will be used as the binding number, so entry 0 contains `inputA`, entry 1 `inputB`, and entry 2 `output`. This only fills a local array; it has not updated the set yet.
 
-각 버퍼의 처음부터 전체 데이터를 사용하겠습니다. 배열을 채운 코드 아래에 다음 반복문을 추가합니다.
+Use all the data from the start of each buffer. Add this loop below the array initialization.
 
 ```cpp
 for (auto& bufferInfo : bufferInfos)
@@ -160,21 +160,21 @@ for (auto& bufferInfo : bufferInfos)
 }
 ```
 
-`offset`은 버퍼 안에서 사용할 영역의 시작 위치이고, `range`는 그 영역의 바이트 크기입니다. 이전 장에서 `bufferSize`를 `sizeof(float) * elementCount`로 정했으므로 각 버퍼의 모든 원소가 포함됩니다.
+`offset` is the start of the region within the buffer, and `range` is its size in bytes. The previous lesson defined `bufferSize` as `sizeof(float) * elementCount`, so the region includes every element in each buffer.
 
-## 어느 바인딩에 쓸지 지정하기
+## Specify the destination bindings
 
-버퍼 정보가 준비됐으니, 이제 갱신할 셋과 바인딩 번호를 함께 지정하겠습니다. `vk::WriteDescriptorSet` 하나는 디스크립터에 써 넣을 정보를 나타냅니다. 버퍼 영역을 채운 반복문 아래에 배열과 새 반복문을 추가합니다.
+With the buffer information ready, specify the destination set and binding numbers. Each `vk::WriteDescriptorSet` describes information to write to descriptors. Add an array and another loop below the loop that filled the buffer regions.
 
 ```cpp
 std::array<vk::WriteDescriptorSet, 3> writes{};
 for (uint32_t i = 0; i < writes.size(); ++i)
 {
-    // 이 바인딩에 써 넣을 디스크립터 정보를 지정합니다.
+    // Specify the descriptor information to write to this binding.
 }
 ```
 
-먼저 반복문 안의 주석을 다음 코드로 바꿉니다. 세 항목 모두 같은 셋을 갱신하며, 바인딩 번호만 `i`에 따라 달라집니다.
+First, replace the comment inside the loop with this code. All three entries update the same set; only the binding number changes with `i`.
 
 ```cpp
 writes[i].dstSet = *descriptorSets[0];
@@ -182,40 +182,40 @@ writes[i].dstBinding = i;
 writes[i].dstArrayElement = 0;
 ```
 
-`dstSet`은 갱신할 셋, `dstBinding`은 그 안의 바인딩 번호입니다. 바인딩은 디스크립터 배열을 가질 수도 있는데, 우리는 바인딩마다 하나만 두므로 첫 원소를 뜻하는 `dstArrayElement = 0`을 사용합니다.
+`dstSet` is the set to update, and `dstBinding` is the binding number within it. A binding can contain an array of descriptors. Each binding here has only one, so use `dstArrayElement = 0` to select its first element.
 
-이어서 같은 반복문 안에 디스크립터의 유형과 개수를 넣습니다. 이 값들은 이전 장의 레이아웃에서 정한 구조와 맞아야 합니다.
+Continue inside the same loop by setting the descriptor type and count. These values must match the structure defined by the layout in the previous lesson.
 
 ```cpp
 writes[i].descriptorType = vk::DescriptorType::eStorageBuffer;
 writes[i].descriptorCount = 1;
 ```
 
-각 바인딩에 스토리지 버퍼 디스크립터 하나를 씁니다. 마지막으로 앞에서 준비한 버퍼 정보를 연결합니다.
+Write one storage buffer descriptor to each binding. Finally, connect the buffer information prepared earlier.
 
 ```cpp
 writes[i].pBufferInfo = &bufferInfos[i];
 ```
 
-이제 `writes[0]`은 셋의 0번 바인딩에 `inputA`의 영역을, `writes[1]`은 1번에 `inputB`의 영역을, `writes[2]`는 2번에 `output`의 영역을 쓰도록 지정됐습니다.
+`writes[0]` now specifies the `inputA` region for binding 0, `writes[1]` the `inputB` region for binding 1, and `writes[2]` the `output` region for binding 2.
 
-## 셋에 갱신 내용 적용하기
+## Apply the updates to the set
 
-반복문까지는 갱신할 내용을 지역 배열에 준비한 것입니다. 반복문이 끝난 뒤 다음 함수를 호출해야 실제 디스크립터 셋에 반영됩니다.
+So far, the loop has only prepared the updates in local arrays. Call this function after the loop to apply them to the actual descriptor set.
 
 ```cpp
 device.updateDescriptorSets(writes, {}); // C API: vkUpdateDescriptorSets
 ```
 
-첫 번째 인수는 방금 채운 갱신 항목들입니다. 두 번째 인수에는 다른 디스크립터에서 복사할 항목을 전달할 수 있지만, 여기서는 사용하지 않아 빈 목록 `{}`을 넘깁니다.
+The first argument contains the update entries just filled in. The second can specify descriptors to copy from other descriptors. No copies are needed here, so pass an empty list, `{}`.
 
-이 호출은 버퍼 속 데이터를 복사하는 것이 아니라 셋이 해당 버퍼 영역을 참조하도록 설정합니다. 버퍼 데이터는 이전 장에서 메모리에 써 두었습니다. 함수 마지막에서는 할당받은 셋 개수를 컨테이너에서 읽어 출력합니다.
+This call configures the set to refer to the buffer regions; it does not copy the data inside the buffers. The previous lesson already wrote that data to memory. At the end of the function, read the allocated set count from the container and print it.
 
 ```cpp
 std::cout << "Descriptor sets updated: " << descriptorSets.size() << '\n';
 ```
 
-어느 바인딩에 무엇을 연결했는지도 확인하겠습니다. 갱신에 사용한 `writes`를 순회하면서 실제 바인딩 번호와 유형, 개수를 출력합니다.
+Also check what was connected to each binding. Iterate over the `writes` used for the update and print the actual binding numbers, types, and counts.
 
 ```cpp
 for (const auto& write : writes)
@@ -223,11 +223,11 @@ for (const auto& write : writes)
     std::cout << "Binding " << write.dstBinding << ": "
               << vk::to_string(write.descriptorType) << ", "
               << write.descriptorCount << " descriptors\n";
-    // 이 바인딩이 참조하는 버퍼 영역을 출력합니다.
+    // Print the buffer regions referenced by this binding.
 }
 ```
 
-반복문 안의 주석을 다음 코드로 바꿉니다. 버퍼 핸들은 해당 리소스를 식별하며 실행마다 달라질 수 있습니다. 오프셋과 범위는 위에서 디스크립터에 설정한 값입니다.
+Replace the comment inside the loop with this code. Buffer handles identify resources and may differ between runs. The offsets and ranges are the values set in the descriptors above.
 
 ```cpp
 for (uint32_t i = 0; i < write.descriptorCount; ++i)
@@ -238,26 +238,26 @@ for (uint32_t i = 0; i < write.descriptorCount; ++i)
 }
 ```
 
-바깥 반복문까지 끝난 뒤 성공을 반환합니다.
+Return success after the outer loop ends.
 
 ```cpp
 return true;
 ```
 
 > [!NOTE]
-> **생각해볼 점**
+> **Questions to consider**
 >
-> GPU의 이전 사용이 끝났고 다음 실행 명령을 기록하기 전이라고 가정합니다. 아래 상황마다 버퍼, 디스크립터 셋, 풀, 레이아웃 중 무엇을 재사용하고 무엇을 갱신하거나 새로 만들어야 할까요?
+> Assume that the GPU has finished its previous use of the resources and commands for the next execution have not yet been recorded. In each case below, which buffers, descriptor sets, pools, and layouts can be reused, and which must be updated or created?
 >
-> - 기존 A와 B 버퍼의 같은 영역에 새 숫자를 넣어 C에 결과를 저장합니다. 원소 수와 자료형은 같습니다.
-> - A 대신 크기와 자료형이 같은 A′ 버퍼를 사용합니다. A′는 이미 준비되어 있고 기존 A와의 연결 정보는 보존하지 않아도 됩니다.
-> - `C₀ = A₀ + B₀`와 `C₁ = A₁ + B₁`을 번갈아 실행합니다. 여섯 버퍼가 준비되어 있고 셰이더와 바인딩 구조는 같습니다. 첫 묶음의 셋만 있으며, 풀에는 여유가 있습니다. 두 연결 정보를 모두 보관하고 실행마다 디스크립터를 다시 쓰지 않으려면 무엇이 필요할까요?
-> - `maxSets = 3`, 스토리지 버퍼 디스크립터 총용량이 6인 풀에서 디스크립터 3개짜리 셋 두 개를 할당했습니다. 기존 셋을 유지하면서 같은 구조의 셋 하나를 더 추가하려고 하며, 새 셋에 연결할 버퍼들은 준비되어 있습니다. 기존 풀의 용량이 충분한가요? 부족하다면 무엇을 준비해야 하며, 레이아웃도 다시 만들어야 할까요?
-> - 기존 스토리지 버퍼 바인딩 0~2에 더해, 새 셰이더가 설정값을 받을 유니폼 버퍼 바인딩 3을 요구합니다. 설정값 버퍼가 준비되어 있고 풀의 셋 수와 타입별 용량도 충분합니다. 기존 셋에 write만 추가하면 될까요? 파이프라인 설정은 제외하고 생각해 보세요.
+> - Write new numbers into the same regions of the existing A and B buffers and store the result in C. The element count and data type stay the same.
+> - Replace A with buffer A' of the same size and data type. A' is already prepared, and the existing reference to A does not need to be retained.
+> - Alternate between `C₀ = A₀ + B₀` and `C₁ = A₁ + B₁`. All six buffers are ready, and the shader and binding structure are the same. Only the first group's set exists, and the pool has spare capacity. What is needed to retain both groups of buffer references without rewriting descriptors on each run?
+> - A pool has `maxSets = 3` and capacity for 6 storage buffer descriptors. Two sets with 3 descriptors each have been allocated. One more set of the same structure is needed while retaining the existing sets, and its buffers are ready. Does the pool have enough capacity? If not, what must be prepared, and must the layout also be recreated?
+> - In addition to the existing storage buffer bindings 0 through 2, a new shader requires a uniform buffer at binding 3 for settings. The settings buffer is ready, and the pool has enough set capacity and capacity for each descriptor type. Is adding another write to the existing set enough? Leave pipeline configuration out of this comparison.
 
-## 초기화 순서에 연결하기
+## Connect the initialization steps
 
-풀 생성과 셋 할당·갱신 함수가 모두 완성됐습니다. 이제 `initVulkan()`의 끝부분의 `&& createDescriptorSetLayout();` 한 줄을 다음 세 줄로 바꿉니다. 앞서 작성한 초기화 호출은 그대로 이어집니다.
+The functions for creating the pool and allocating and updating sets are complete. Replace the final `&& createDescriptorSetLayout();` line in `initVulkan()` with these three lines. Keep the earlier initialization calls.
 
 ```cpp
     && createDescriptorSetLayout()
@@ -265,13 +265,13 @@ return true;
     && createDescriptorSets();
 ```
 
-레이아웃이 만들어지면 풀을 만들고, 그 풀에서 셋을 할당해 버퍼 정보를 채웁니다. 앞 단계가 `false`를 반환하면 뒤의 호출은 실행되지 않습니다.
+After the layout is created, create the pool, allocate a set from it, and fill in the buffer information. If an earlier step returns `false`, the following calls are skipped.
 
-여기까지 작성하면 버퍼를 참조하는 디스크립터 셋이 준비됩니다. 셰이더가 이 셋을 사용해 연산하려면 이후 파이프라인과 커맨드 버퍼를 준비하고, 셋을 바인딩한 뒤 컴퓨트 명령을 제출해야 합니다.
+The descriptor set now refers to the buffers. To compute with this set, later lessons must prepare the pipeline and command buffer, bind the set, and submit compute commands.
 
-## 빌드와 실행
+## Build and run
 
-[환경 설정](../00-env-settings/README.md)을 마친 뒤, 저장소 루트에서 예제 폴더로 이동합니다.
+After completing [Environment settings](../00-env-settings/README.md), change from the repository root to the example directory.
 
 ```sh
 cd examples/07-descriptor-sets
@@ -279,7 +279,7 @@ cd examples/07-descriptor-sets
 
 ### Windows
 
-Visual Studio 생성기를 기준으로 빌드하고 실행합니다.
+Build and run with the Visual Studio generator.
 
 ```powershell
 cmake -S . -B build
@@ -287,7 +287,7 @@ cmake --build build --config Debug --target descriptor_sets_example
 .\build\Debug\main.exe
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```powershell
 cmake --build build --config Debug --target descriptor_sets_completed
@@ -296,7 +296,7 @@ cmake --build build --config Debug --target descriptor_sets_completed
 
 ### Linux
 
-Makefiles 또는 Ninja를 기준으로 빌드하고 실행합니다.
+Build and run with Makefiles or Ninja.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -304,19 +304,19 @@ cmake --build build --target descriptor_sets_example
 ./build/main
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```sh
 cmake --build build --target descriptor_sets_completed
 ./build/completed/main
 ```
 
-### 실행 결과
+### Expected output
 
-풀에서 제공하는 셋·디스크립터 용량을 확인합니다. 갱신 결과에서는 각 바인딩이 의도한 입력·출력 버퍼에 연결되었는지 코드와 대조해 보세요.
+Check the set and descriptor capacity provided by the pool. Compare the update output with the code to verify that each binding refers to the intended input or output buffer.
 
-이 장의 코드를 완성한 뒤, 실행 결과가 보이도록 터미널을 캡처해 제출합니다.
+After completing the code for this lesson, submit a screenshot of the terminal showing the output.
 
 ---
 
-이 문서는 [Khronos Vulkan Tutorial: Descriptor pool and sets](https://docs.vulkan.org/tutorial/latest/05_Uniform_buffers/01_Descriptor_pool_and_sets.html)를 컴퓨트 실습에 맞게 번역·각색했습니다. 원문과 이 문서는 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)을 따릅니다.
+This document was translated and adapted from [Khronos Vulkan Tutorial: Descriptor pool and sets](https://docs.vulkan.org/tutorial/latest/05_Uniform_buffers/01_Descriptor_pool_and_sets.html) for compute exercises. The original material and this document are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

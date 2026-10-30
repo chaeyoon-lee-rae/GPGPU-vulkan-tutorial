@@ -1,28 +1,28 @@
-# 02. 검증 레이어
+# 02. Validation layers
 
-[이전: 인스턴스 생성과 해제](../01-instance/README.md) · [다음: 물리 디바이스와 큐 패밀리](../03-physical-devices/README.md) · [전체 튜토리얼](../../README.md#튜토리얼)
+[Previous: Create and destroy an instance](../01-instance/README.md) | [Next: Physical devices and queue families](../03-physical-devices/README.md) | [All tutorials](../../README.md#tutorials)
 
-Vulkan API 자체의 오류 검사는 제한적입니다. 개발 중에는 검증 레이어(Validation layer)를 활성화해 잘못된 인자나 객체 사용 순서에 관한 메시지를 받아 볼 수 있습니다. 레이어가 문제를 검사하고, 우리가 작성할 콜백은 그 메시지를 콘솔에 출력합니다.
+The Vulkan API itself performs limited error checking. During development, enable a validation layer to receive messages about invalid arguments or incorrect object usage order. The layer checks for problems, and the callback written in this lesson prints its messages to the console.
 
-[main.cpp](main.cpp)는 01장의 인스턴스 생성 코드에서 시작합니다. 레이어를 사용할 수 있는지 확인하는 것부터 작성해 보겠습니다. 완성된 코드는 공개 후 `examples/99-completed/02-validation-layers.cpp`에서 확인할 수 있습니다.
+[main.cpp](main.cpp) starts with the instance creation code from lesson 01. Begin by checking whether the layer is available. Once published, the completed code is available in `examples/99-completed/02-validation-layers.cpp`.
 
-## 사용할 레이어 이름 정하기
+## Define the layer name
 
-이 실습에서는 `VK_LAYER_KHRONOS_validation`을 사용합니다. 검색할 때와 활성화할 때 같은 이름을 쓸 수 있도록 `private` 바로 아래에 상수를 추가합니다.
+This exercise uses `VK_LAYER_KHRONOS_validation`. Add a constant directly below `private` so that the same name is used to find and enable the layer.
 
 ```cpp
 static constexpr const char* validationLayer = "VK_LAYER_KHRONOS_validation";
 ```
 
-설치된 레이어의 이름과 이 문자열을 비교하려면 `std::strcmp()`가 필요합니다. 파일 위쪽의 헤더 목록에 `<cstring>`도 추가합니다.
+Use `std::strcmp()` to compare this string with the installed layer names. Add `<cstring>` to the headers at the top of the file.
 
 ```cpp
 #include <cstring>
 ```
 
-## 레이어가 설치되어 있는지 확인하기
+## Check whether the layer is installed
 
-레이어 이름을 알고 있어도 시스템에 설치되어 있지 않으면 사용할 수 없습니다. `private` 영역에 검사 함수의 틀을 추가합니다. 레이어를 찾으면 `true`, 찾지 못하면 `false`를 반환하겠습니다.
+Knowing the layer's name is not enough; it must be installed on the system. Add an empty check function in the `private` section. It will return `true` if the layer is found and `false` otherwise.
 
 ```cpp
 bool checkValidationLayerSupport()
@@ -30,22 +30,22 @@ bool checkValidationLayerSupport()
 }
 ```
 
-먼저 이 함수 안에서 설치된 레이어 목록을 가져옵니다. 아직 인스턴스를 만들기 전이므로 `context`로 조회합니다.
+First, retrieve the installed layers inside this function. Use `context` because the instance has not been created yet.
 
 ```cpp
 const auto layers = context.enumerateInstanceLayerProperties(); // C API: vkEnumerateInstanceLayerProperties
 ```
 
-조회한 목록을 하나씩 확인할 반복문을 그 아래에 만듭니다.
+Below this query, add a loop to examine each entry.
 
 ```cpp
 for (const auto& layer : layers)
 {
-    // 사용할 레이어와 이름이 같은지 확인합니다.
+    // Check whether the name matches the required layer.
 }
 ```
 
-`layerName`은 각 레이어의 이름입니다. 반복문 안의 주석을 아래 코드로 바꿉니다. `std::strcmp()`는 두 문자열이 같으면 0을 반환합니다.
+`layerName` contains each layer's name. Replace the comment inside the loop with the code below. `std::strcmp()` returns 0 when the strings match.
 
 ```cpp
 if (std::strcmp(layer.layerName, validationLayer) == 0)
@@ -54,16 +54,16 @@ if (std::strcmp(layer.layerName, validationLayer) == 0)
 }
 ```
 
-일치하는 이름을 찾으면 함수가 끝납니다. 반대로 반복문을 끝까지 통과했다면 필요한 레이어가 없는 것입니다. 반복문 뒤에 오류 출력과 실패 반환을 추가합니다.
+The function returns as soon as it finds a matching name. If the loop finishes without a match, the required layer is missing. After the loop, print an error and return failure.
 
 ```cpp
 std::cerr << "Required layer not found: " << validationLayer << '\n';
 return false;
 ```
 
-## 메시지를 받을 콜백 작성하기
+## Write a callback to receive messages
 
-레이어가 발견한 문제를 받으려면 Vulkan이 호출할 함수를 준비해야 합니다. `private` 영역에 다음 콜백의 틀을 추가합니다.
+Prepare a function that Vulkan can call to report problems found by the layer. Add this empty callback in the `private` section.
 
 ```cpp
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -75,11 +75,11 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 }
 ```
 
-`severity`는 메시지의 심각도, `type`은 메시지 종류입니다. `callbackData`에는 식별자와 본문이 들어 있습니다. 마지막 인자는 사용자 데이터를 받는 자리이며 이 예제에서는 사용하지 않습니다.
+`severity` is the message severity, and `type` is the message type. `callbackData` contains the identifier and message text. The last parameter accepts user data and is unused in this example.
 
-Vulkan에 일반 함수 포인터로 전달할 수 있도록 `this`가 없는 `static` 멤버 함수로 만들었습니다. `VKAPI_ATTR`과 `VKAPI_CALL`은 Vulkan이 요구하는 호출 형식을 맞춥니다.
+This is a `static` member function with no `this` pointer, so it can be passed to Vulkan as an ordinary function pointer. `VKAPI_ATTR` and `VKAPI_CALL` match the calling conventions Vulkan requires.
 
-먼저 함수 본문에 심각도와 종류를 출력하는 코드를 넣습니다. C API의 형식을 Vulkan-Hpp 형식으로 변환하면 `vk::to_string()`으로 이름을 출력할 수 있습니다.
+First, add code to print the severity and type. Converting the C API types to Vulkan-Hpp types allows `vk::to_string()` to print their names.
 
 ```cpp
 std::cerr << "[debug "
@@ -87,22 +87,22 @@ std::cerr << "[debug "
           << ' ' << vk::to_string(vk::DebugUtilsMessageTypeFlagsEXT(type)) << "] ";
 ```
 
-메시지를 구분할 식별자와 실제 내용을 이어서 출력합니다. 식별자 포인터가 비어 있으면 `"unnamed"`를 사용합니다.
+Continue by printing the message identifier and text. Use `"unnamed"` if the identifier pointer is null.
 
 ```cpp
 std::cerr << (callbackData->pMessageIdName ? callbackData->pMessageIdName : "unnamed")
           << ": " << callbackData->pMessage << '\n';
 ```
 
-이 콜백은 메시지를 출력한 뒤 Vulkan 호출을 계속 진행하게 합니다. 함수 마지막에 `VK_FALSE`를 반환합니다.
+This callback lets the Vulkan call continue after printing the message. Return `VK_FALSE` at the end of the function.
 
 ```cpp
 return VK_FALSE;
 ```
 
-## 어떤 메시지를 받을지 설정하기
+## Select which messages to receive
 
-콜백을 만들었으니 어떤 심각도와 종류의 메시지를 전달할지 정해야 합니다. 같은 설정을 인스턴스 생성 시점과 생성 후에 사용할 수 있도록 생성 정보를 돌려주는 함수를 `private` 영역에 추가합니다.
+With the callback ready, select the message severities and types to receive. Add a function in the `private` section that returns the creation information, so the same settings can be used both during and after instance creation.
 
 ```cpp
 static vk::DebugUtilsMessengerCreateInfoEXT makeDebugMessengerCreateInfo()
@@ -110,7 +110,7 @@ static vk::DebugUtilsMessengerCreateInfoEXT makeDebugMessengerCreateInfo()
 }
 ```
 
-먼저 함수 안에 생성 정보 구조체를 만들고, 경고와 오류를 받도록 지정합니다.
+First, create the information structure inside the function and select warnings and errors.
 
 ```cpp
 vk::DebugUtilsMessengerCreateInfoEXT createInfo{};
@@ -118,9 +118,9 @@ createInfo.messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning
                            | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError;
 ```
 
-`|`는 비트 OR 연산입니다. 이렇게 여러 플래그를 합치면 Warning이나 Error에 해당하는 메시지를 받을 수 있습니다.
+`|` is the bitwise OR operator. Combining the flags this way selects messages with either Warning or Error severity.
 
-그 아래에는 받을 메시지 종류를 지정합니다. 일반 메시지, API 사용 검증, 성능 관련 메시지를 모두 받겠습니다.
+Below that, select the message types. Receive general messages, API validation messages, and performance messages.
 
 ```cpp
 createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
@@ -128,16 +128,16 @@ createInfo.messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral
                        | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance;
 ```
 
-이제 이 조건에 해당하는 메시지를 처리할 함수를 연결합니다. 앞에서 작성한 `debugCallback`을 지정하고 생성 정보를 반환합니다.
+Connect the function that handles messages matching these conditions. Set the previously written `debugCallback` and return the creation information.
 
 ```cpp
 createInfo.setPfnUserCallback(debugCallback);
 return createInfo;
 ```
 
-## 인스턴스 생성 전에 지원 여부 검사하기
+## Check support before creating the instance
 
-레이어 검사 함수가 준비됐으니 기존 `createInstance()`에서 사용하겠습니다. 지원하지 않을 때 실패를 돌려줄 수 있도록 반환형을 `void`에서 `bool`로 바꿉니다. 기존 본문은 남겨 두고, 함수 맨 앞에 다음 코드를 넣습니다.
+Use the layer check in the existing `createInstance()` function. Change its return type from `void` to `bool` so it can report failure when the layer is unavailable. Keep the existing body and insert this code at its beginning.
 
 ```cpp
 if (!checkValidationLayerSupport())
@@ -146,15 +146,15 @@ if (!checkValidationLayerSupport())
 }
 ```
 
-레이어를 찾지 못했다면 인스턴스를 만들지 않고 종료합니다. 아래에 있는 `appInfo` 설정은 그대로 사용합니다.
+If the layer is missing, return without creating an instance. Keep the `appInfo` settings below this code.
 
-콜백 등록과 메시지 제출에는 `VK_EXT_debug_utils` 확장도 필요합니다. 기존 확장 목록 조회 줄 바로 아래, 반복문 앞에 검색 결과를 저장할 변수를 추가합니다.
+Registering the callback and submitting messages also require the `VK_EXT_debug_utils` extension. Directly below the existing extension query and before the loop, add a variable to store the search result.
 
 ```cpp
 bool debugUtilsAvailable = false;
 ```
 
-기존 `for (const auto& extension : extensions)` 안에 아래 검사를 추가합니다.
+Add this check inside the existing `for (const auto& extension : extensions)` loop.
 
 ```cpp
 if (std::strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0)
@@ -163,7 +163,7 @@ if (std::strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0
 }
 ```
 
-목록의 확장 이름이 필요한 이름과 일치하면 사용 가능하다고 표시합니다. 모든 확장을 확인한 뒤에도 `false`라면 진행할 수 없으므로, 반복문이 끝난 다음에 아래 조건을 넣습니다.
+When an extension name matches the required name, mark it as available. If the variable remains `false` after all extensions have been checked, initialization cannot continue. Add this condition after the loop.
 
 ```cpp
 if (!debugUtilsAvailable)
@@ -173,60 +173,60 @@ if (!debugUtilsAvailable)
 }
 ```
 
-## 레이어와 확장을 인스턴스에 연결하기
+## Enable the layer and extension for the instance
 
-지원 여부를 확인하는 것만으로 기능이 활성화되지는 않습니다. 이제 같은 `createInstance()` 안의 `vk::InstanceCreateInfo` 설정으로 내려가겠습니다. 기존 `createInfo.pApplicationInfo = &appInfo;` 뒤에 사용할 레이어의 개수와 이름을 추가합니다.
+Checking support does not enable a feature. In the same `createInstance()` function, find the `vk::InstanceCreateInfo` settings. After the existing `createInfo.pApplicationInfo = &appInfo;`, add the layer count and name.
 
 ```cpp
 createInfo.enabledLayerCount = 1;
 createInfo.ppEnabledLayerNames = &validationLayer;
 ```
 
-확장도 이름 목록과 개수를 전달해야 합니다. 기존 `vk::InstanceCreateInfo createInfo{};` 선언 바로 앞에 배열을 추가합니다.
+The extension also needs a name list and count. Add an array immediately before the existing `vk::InstanceCreateInfo createInfo{};` declaration.
 
 ```cpp
 const char* requiredExtensions[] = {VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
 ```
 
-그리고 레이어 설정 바로 아래에 이 배열을 연결합니다.
+Connect this array directly below the layer settings.
 
 ```cpp
 createInfo.enabledExtensionCount = 1;
 createInfo.ppEnabledExtensionNames = requiredExtensions;
 ```
 
-인스턴스를 생성하거나 해제하는 과정의 메시지도 받고 싶습니다. 이를 위해 `requiredExtensions` 배열 다음, `createInfo` 선언 전에 앞서 만든 콜백 설정을 준비합니다.
+Messages during instance creation and destruction should also be received. After the `requiredExtensions` array and before the `createInfo` declaration, prepare the callback settings defined earlier.
 
 ```cpp
 auto debugCreateInfo = makeDebugMessengerCreateInfo();
 ```
 
-인스턴스 생성 정보의 `pNext`는 추가 설정 구조체를 연결하는 자리입니다. 확장 설정 아래에 다음 줄을 추가하면 인스턴스 생성·해제 시점에도 이 콜백 설정을 사용합니다.
+The instance creation information's `pNext` field connects additional settings structures. Add this line below the extension settings to use the callback settings during instance creation and destruction.
 
 ```cpp
 createInfo.pNext = &debugCreateInfo;
 ```
 
-그 아래의 `instance = vk::raii::Instance(context, createInfo);`는 그대로 사용합니다. 인스턴스 생성 바로 아래에 활성화한 레이어 이름을 출력하고, 함수 끝에 성공을 반환합니다.
+Keep the following `instance = vk::raii::Instance(context, createInfo);` line. Directly after creating the instance, print the enabled layer name and return success at the end of the function.
 
 ```cpp
 std::cout << "Validation layer enabled: " << validationLayer << '\n';
 return true;
 ```
 
-## 인스턴스 생성 후에도 메시지 받기
+## Receive messages after instance creation
 
-`pNext`에 연결한 설정은 인스턴스 생성·해제 때 사용됩니다. 인스턴스가 살아 있는 동안의 Vulkan 호출에서도 메시지를 받으려면 디버그 메신저(Debug messenger) 객체를 따로 만들어야 합니다.
+The settings connected through `pNext` apply during instance creation and destruction. To receive messages from Vulkan calls throughout the instance's lifetime, create a separate debug messenger object.
 
-먼저 기존 `instance` 멤버 바로 아래에 디버그 메신저를 보관할 멤버를 추가합니다.
+First, add a member to hold the debug messenger directly below the existing `instance` member.
 
 ```cpp
 vk::raii::DebugUtilsMessengerEXT debugMessenger = nullptr;
 ```
 
-RAII 멤버는 선언의 역순으로 해제됩니다. 따라서 이 위치에 두면 디버그 메신저가 먼저 해제되고 인스턴스는 그 뒤에 해제됩니다.
+RAII members are destroyed in reverse declaration order. Placing the member here ensures that the debug messenger is destroyed before the instance.
 
-이제 `private` 영역에 디버그 메신저를 생성할 함수의 틀을 추가합니다.
+Add an empty function in the `private` section to create the debug messenger.
 
 ```cpp
 bool setupDebugMessenger()
@@ -234,22 +234,22 @@ bool setupDebugMessenger()
 }
 ```
 
-함수 안에서 앞서 만든 설정을 이용해 디버그 메신저를 생성하고 멤버에 저장합니다.
+Inside the function, create the debug messenger with the settings prepared earlier and store it in the member.
 
 ```cpp
 debugMessenger = instance.createDebugUtilsMessengerEXT(makeDebugMessengerCreateInfo()); // C API: vkCreateDebugUtilsMessengerEXT
 ```
 
-생성이 끝났는지 확인할 출력과 성공 반환을 그 아래에 추가합니다.
+Below that, print a message to confirm creation and return success.
 
 ```cpp
 std::cout << "Debug messenger created.\n";
 return true;
 ```
 
-## 콜백으로 확인용 메시지 보내기
+## Send a test message to the callback
 
-오류가 없는 코드에서는 콜백의 출력이 보이지 않을 수 있습니다. 등록된 콜백이 호출되는지 확인할 수 있도록 메시지를 직접 제출해 보겠습니다. `private` 영역에 함수의 틀을 추가합니다.
+Code without errors may produce no callback output. Submit a message directly to check that the registered callback is called. Add an empty function in the `private` section.
 
 ```cpp
 void submitDebugMessage()
@@ -257,7 +257,7 @@ void submitDebugMessage()
 }
 ```
 
-먼저 함수 안에 식별자와 메시지 본문을 담습니다.
+First, set the identifier and message text inside the function.
 
 ```cpp
 vk::DebugUtilsMessengerCallbackDataEXT callbackData{};
@@ -265,7 +265,7 @@ callbackData.pMessageIdName = "tutorial.callback-check";
 callbackData.pMessage = "Application-injected callback check; this is not a validation error.";
 ```
 
-그 아래에서 메시지를 제출합니다. 앞에서 정한 필터를 통과하도록 심각도는 Warning, 종류는 General로 지정합니다.
+Below that, submit the message. Set the severity to Warning and the type to General so it passes the filters configured earlier.
 
 ```cpp
 instance.submitDebugUtilsMessageEXT( // C API: vkSubmitDebugUtilsMessageEXT
@@ -274,11 +274,11 @@ instance.submitDebugUtilsMessageEXT( // C API: vkSubmitDebugUtilsMessageEXT
     callbackData);
 ```
 
-이 메시지는 검증 레이어가 발견한 오류가 아니라 애플리케이션이 직접 보낸 확인용 메시지입니다. 이 장에서만 사용하고, 03장부터는 함수와 호출을 제거합니다.
+This is a test message submitted by the application, not an error found by the validation layer. Use it only in this lesson; remove the function and its call from lesson 03 onward.
 
-## 초기화와 실행 순서 연결하기
+## Connect initialization and execution
 
-필요한 함수를 모두 작성했으니 실행 흐름에 연결하겠습니다. 기존 `initVulkan()`을 다음과 같이 바꿉니다.
+With the required functions written, connect them to the execution flow. Replace the existing `initVulkan()` with the following.
 
 ```cpp
 bool initVulkan()
@@ -287,9 +287,9 @@ bool initVulkan()
 }
 ```
 
-`&&`의 왼쪽이 `false`면 오른쪽을 실행하지 않습니다. 레이어나 확장 검사에서 실패하면 디버그 메신저 생성 단계로 넘어가지 않습니다.
+If the left side of `&&` is `false`, the right side is not evaluated. A failed layer or extension check therefore prevents debug messenger creation.
 
-초기화가 실패했을 때 확인용 메시지도 보내지 않아야 합니다. `public` 영역에 있는 기존 `run()`의 반환형을 `bool`로 바꾸고, 본문의 `initVulkan();` 호출을 아래 조건으로 교체합니다.
+The test message must also be skipped if initialization fails. Change the return type of the existing `run()` function in the `public` section to `bool`, and replace its `initVulkan();` call with this condition.
 
 ```cpp
 if (!initVulkan())
@@ -298,14 +298,14 @@ if (!initVulkan())
 }
 ```
 
-조건문 뒤, 함수가 끝나기 전에 메시지를 제출하고 성공을 반환합니다.
+After the condition and before the function ends, submit the message and return success.
 
 ```cpp
 submitDebugMessage();
 return true;
 ```
 
-마지막으로 `main()`도 실행 결과를 받아야 합니다. 기존 안쪽 블록의 `ComputeApplication app;`는 남겨 두고, `app.run();` 한 줄을 다음 조건으로 바꿉니다.
+Finally, `main()` must handle the execution result. Keep `ComputeApplication app;` in the existing inner block and replace the single `app.run();` line with this condition.
 
 ```cpp
 if (!app.run())
@@ -314,13 +314,13 @@ if (!app.run())
 }
 ```
 
-실패는 종료 코드 1로 전달됩니다. 성공하면 안쪽 블록을 빠져나오며 디버그 메신저와 인스턴스가 순서대로 해제됩니다. 블록 뒤의 종료 출력은 시작 코드에 준비되어 있습니다.
+Failure produces exit code 1. On success, leaving the inner block destroys the debug messenger and then the instance. The starter code already includes the output statement after that block.
 
-이제 레이어 지원 확인 → 인스턴스 생성 → 디버그 메신저 생성 → 확인용 메시지 제출 순서로 실행됩니다. 다음 장부터는 이 설정으로 실제 Vulkan 사용 중 발생하는 메시지를 받으면서 물리 디바이스를 선택하겠습니다.
+Execution now checks layer support, creates the instance, creates the debug messenger, and submits the test message in that order. Starting in the next lesson, use this setup to receive messages from actual Vulkan usage while selecting a physical device.
 
-## 빌드와 실행
+## Build and run
 
-[환경 설정](../00-env-settings/README.md)을 마친 뒤, 저장소 루트에서 이 예제 폴더로 이동합니다.
+After completing [Environment settings](../00-env-settings/README.md), change from the repository root to this example directory.
 
 ```sh
 cd examples/02-validation-layers
@@ -328,7 +328,7 @@ cd examples/02-validation-layers
 
 ### Windows
 
-Visual Studio 생성기를 기준으로 빌드하고 실행합니다.
+Build and run with the Visual Studio generator.
 
 ```powershell
 cmake -S . -B build
@@ -336,7 +336,7 @@ cmake --build build --config Debug --target validation_layers
 .\build\Debug\main.exe
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```powershell
 cmake --build build --config Debug --target validation_layers_completed
@@ -345,7 +345,7 @@ cmake --build build --config Debug --target validation_layers_completed
 
 ### Linux
 
-Makefiles 또는 Ninja를 기준으로 빌드하고 실행합니다.
+Build and run with Makefiles or Ninja.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -353,19 +353,19 @@ cmake --build build --target validation_layers
 ./build/main
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```sh
 cmake --build build --target validation_layers_completed
 ./build/completed/main
 ```
 
-### 실행 결과
+### Expected output
 
-활성화한 레이어 이름과 디버그 메신저 생성 여부를 확인합니다. 직접 제출한 메시지가 콜백에 도착했다면 심각도·종류·본문이 함께 출력되어야 합니다.
+Check the enabled layer name and the debug messenger creation message. If the submitted message reaches the callback, its severity, type, and text should appear together.
 
-이 장의 코드를 완성한 뒤, 실행 결과가 보이도록 터미널을 캡처해 제출합니다.
+After completing the code for this lesson, submit a screenshot of the terminal showing the output.
 
 ---
 
-이 문서는 [Khronos Vulkan Tutorial: Validation layers](https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/02_Validation_layers.html)를 컴퓨트 실습에 맞게 번역·각색했습니다. 원문과 이 문서는 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)을 따릅니다.
+This document was translated and adapted from [Khronos Vulkan Tutorial: Validation layers](https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/02_Validation_layers.html) for compute exercises. The original material and this document are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

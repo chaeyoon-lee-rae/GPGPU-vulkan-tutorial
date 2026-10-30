@@ -1,35 +1,35 @@
-# 09. 컴퓨트 파이프라인
+# 09. Compute pipeline
 
-[이전: 컴퓨트 셰이더](../08-compute-shader/README.md) · [다음: 커맨드 버퍼](../10-command-buffers/README.md) · [전체 튜토리얼](../../README.md#튜토리얼)
+[Previous: Compute shader](../08-compute-shader/README.md) | [Next: Command buffers](../10-command-buffers/README.md) | [All tutorials](../../README.md#tutorials)
 
-이전 장에서 벡터 덧셈 셰이더를 SPIR-V로 컴파일하고 셰이더 모듈을 만들었습니다. 이번에는 셰이더가 사용할 리소스 구조와 진입 함수를 지정해 컴퓨트 파이프라인(Compute pipeline)을 만들겠습니다.
+The previous lesson compiled the vector addition shader to SPIR-V and created a shader module. This lesson creates a compute pipeline by specifying the shader's resource structure and entry point.
 
-파이프라인 레이아웃(Pipeline layout)은 디스크립터 셋 레이아웃과 푸시 상수의 범위를 정의합니다. 컴퓨트 파이프라인은 이 레이아웃과 셰이더의 진입 함수를 묶어 GPU에서 실행할 연산을 준비합니다. 생성 과정에 장치별 컴파일·최적화 비용이 들 수 있으므로 보통 한 번 만든 파이프라인을 여러 디스패치에서 재사용합니다. [파이프라인과 컴파일](https://docs.vulkan.org/guide/latest/pipeline_cache.html)
+A pipeline layout defines descriptor set layouts and push constant ranges. A compute pipeline combines this layout with a shader entry point to prepare an operation for GPU execution. Creation may involve device-specific compilation and optimization, so a pipeline is usually reused across multiple dispatches. See [Pipelines and compilation](https://docs.vulkan.org/guide/latest/pipeline_cache.html).
 
-[main.cpp](main.cpp)에는 08장까지의 코드가 들어 있습니다. 아래 순서대로 두 객체와 생성 함수를 추가합니다. 완성된 코드는 공개 후 `examples/99-completed/09-compute-pipeline.cpp`에서 확인할 수 있습니다. [add.comp](add.comp)와 셰이더 빌드 규칙은 이전 장과 같습니다.
+[main.cpp](main.cpp) contains the code through lesson 08. Add the two objects and their creation functions in the order below. Once published, the completed code is available in `examples/99-completed/09-compute-pipeline.cpp`. [add.comp](add.comp) and the shader build rules are unchanged from the previous lesson.
 
-## 두 레이아웃의 역할 구분하기
+## Distinguish the two layouts
 
-06장의 디스크립터 셋 레이아웃은 셋 하나 안의 바인딩을 정의했습니다. 이번 장의 파이프라인 레이아웃은 그 셋을 셰이더의 어느 셋 번호에 놓을지, 푸시 상수는 어느 범위를 사용할지 정합니다.
+The descriptor set layout in lesson 06 defined the bindings within one set. This lesson's pipeline layout specifies which shader set number that layout belongs to and which push constant ranges are used.
 
-| 객체 | 이 예제에서 정의하는 내용 |
+| Object | What it defines in this example |
 |---|---|
-| `descriptorSetLayout` | 바인딩 0, 1, 2에 각각 스토리지 버퍼 하나 |
-| `pipelineLayout` | 셋 0의 레이아웃, 컴퓨트 단계에서 읽을 4바이트 푸시 상수 |
-| `computePipeline` | 위 레이아웃을 사용하는 셰이더 모듈의 `main` 진입 함수 |
+| `descriptorSetLayout` | One storage buffer at each of bindings 0, 1, and 2 |
+| `pipelineLayout` | The layout for set 0 and a 4-byte push constant read by the compute stage |
+| `computePipeline` | The shader module's `main` entry point using the layout above |
 
-디스크립터 셋에는 실제 버퍼 참조가 들어 있고, 파이프라인 레이아웃에는 그 구조만 들어갑니다. 이렇게 분리하면 같은 바인딩 구조를 유지하는 한 입력·출력 버퍼가 달라져도 파이프라인을 다시 만들 필요가 없습니다. 10장에서 명령을 기록할 때 파이프라인과 디스크립터 셋을 각각 바인딩합니다.
+The descriptor set contains actual buffer references, while the pipeline layout contains only their structure. This separation allows input and output buffers to change without recreating the pipeline, as long as the binding structure stays the same. Lesson 10 binds the pipeline and descriptor set separately when recording commands.
 
-## 파이프라인을 보관할 자리 만들기
+## Add members to hold the pipeline objects
 
-`private` 영역의 `shaderModule` 멤버 바로 아래에 다음 두 멤버를 선언합니다.
+In the `private` section, declare these two members directly below `shaderModule`.
 
 ```cpp
 vk::raii::PipelineLayout pipelineLayout = nullptr;
 vk::raii::Pipeline computePipeline = nullptr;
 ```
 
-빈 RAII 객체로 시작해 초기화 함수에서 실제 객체를 저장합니다. 클래스의 `private` 영역 끝에 파이프라인 레이아웃 생성 함수의 틀을 추가합니다.
+Start with empty RAII objects and store the actual objects during initialization. Add an empty pipeline layout creation function at the end of the class's `private` section.
 
 ```cpp
 bool createPipelineLayout()
@@ -37,9 +37,9 @@ bool createPipelineLayout()
 }
 ```
 
-## 푸시 상수의 범위 정의하기
+## Define the push constant range
 
-셰이더에는 `uint count` 하나를 담은 푸시 상수 블록이 있습니다. 이 값은 버퍼의 바이트 크기가 아니라 연산할 원소 수입니다. 함수 안에 C++ 쪽에서 사용할 범위를 선언합니다.
+The shader has a push constant block containing one `uint count`. This value is the number of elements to process, not the buffer size in bytes. Declare the range used by C++ inside the function.
 
 ```cpp
 vk::PushConstantRange pushConstantRange{};
@@ -48,13 +48,13 @@ pushConstantRange.offset = 0;
 pushConstantRange.size = sizeof(uint32_t);
 ```
 
-`stageFlags`는 값을 읽을 셰이더 단계, `offset`은 푸시 상수 영역 안의 시작 바이트, `size`는 사용할 바이트 수입니다. 이 예제의 GLSL `uint`와 C++ `uint32_t`는 4바이트이므로 오프셋 0부터 4바이트를 컴퓨트 단계에 노출합니다.
+`stageFlags` identifies the shader stage that reads the value, `offset` is the starting byte in push constant storage, and `size` is the byte count. GLSL `uint` and C++ `uint32_t` are both 4 bytes here, so expose 4 bytes from offset 0 to the compute stage.
 
-범위를 정의하는 것과 값을 전달하는 것은 별개입니다. 이 코드는 `count`의 저장 범위를 선언하고, `elementCount`의 실제 값은 10장에서 커맨드 버퍼에 기록합니다. 푸시 상수의 `offset`과 `size`는 4바이트 배수여야 하며, 사용할 범위는 장치의 `maxPushConstantsSize` 안에 있어야 합니다. 여기서는 `uint` 하나만 사용합니다.
+Defining a range and supplying its value are separate steps. This code declares storage for `count`; lesson 10 records the actual value of `elementCount` in the command buffer. Push constant `offset` and `size` must be multiples of 4 bytes, and the range must fit within the device's `maxPushConstantsSize`. This example uses only one `uint`.
 
-## 셋 0의 레이아웃 연결하기
+## Connect the layout for set 0
 
-같은 함수에서 앞 장의 RAII 디스크립터 셋 레이아웃 핸들을 꺼내 생성 정보에 연결합니다.
+In the same function, retrieve the handle from the preceding lesson's RAII descriptor set layout and connect it to the creation information.
 
 ```cpp
 const vk::DescriptorSetLayout layout = *descriptorSetLayout;
@@ -63,36 +63,36 @@ layoutInfo.setLayoutCount = 1;
 layoutInfo.pSetLayouts = &layout;
 ```
 
-`pSetLayouts`는 셋 번호 순서대로 놓인 레이아웃 배열입니다. 원소 하나를 넘기면 그 레이아웃이 셋 0에 대응합니다. 이는 `add.comp`에 적은 `layout(set = 0, binding = ...)`와 맞아야 합니다.
+`pSetLayouts` is an array of layouts ordered by set number. Passing one element assigns that layout to set 0. This must match `layout(set = 0, binding = ...)` in `add.comp`.
 
-이어서 앞에서 만든 푸시 상수 범위를 연결합니다.
+Next, connect the push constant range prepared above.
 
 ```cpp
 layoutInfo.pushConstantRangeCount = 1;
 layoutInfo.pPushConstantRanges = &pushConstantRange;
 ```
 
-`setLayoutCount`는 셋 레이아웃의 개수입니다. 바인딩 세 개를 사용한다고 여기에 3을 넣지 않습니다. `pushConstantRangeCount` 역시 바이트 수가 아니라 범위 정보의 개수입니다.
+`setLayoutCount` is the number of set layouts. Do not set it to 3 because there are three bindings. Similarly, `pushConstantRangeCount` counts range descriptions, not bytes.
 
-## 파이프라인 레이아웃 생성하기
+## Create the pipeline layout
 
-생성 정보를 완성했으니 논리 디바이스에서 레이아웃을 생성합니다.
+With the creation information complete, create the layout on the logical device.
 
 ```cpp
 pipelineLayout = vk::raii::PipelineLayout(device, layoutInfo); // C API: vkCreatePipelineLayout
 ```
 
-이 호출이 끝나면 지역 변수 `layout`과 `pushConstantRange`는 더 보관할 필요가 없습니다. Vulkan은 생성 시 전달한 구조를 사용합니다.
+After this call, the local `layout` and `pushConstantRange` variables do not need to be retained. Vulkan uses the structure supplied during creation.
 
-함수 마지막에 성공을 반환합니다.
+Return success at the end of the function.
 
 ```cpp
 return true;
 ```
 
-## 실행할 컴퓨트 셰이더 지정하기
+## Select the compute shader to run
 
-방금 작성한 함수 아래에 컴퓨트 파이프라인 생성 함수의 틀을 추가합니다.
+Below the function just written, add an empty compute pipeline creation function.
 
 ```cpp
 bool createComputePipeline()
@@ -100,7 +100,7 @@ bool createComputePipeline()
 }
 ```
 
-함수 안에서 셰이더 단계 정보를 작성합니다.
+Inside the function, fill in the shader stage information.
 
 ```cpp
 vk::PipelineShaderStageCreateInfo stageInfo{};
@@ -109,9 +109,9 @@ stageInfo.module = *shaderModule;
 stageInfo.pName = "main";
 ```
 
-`stage`는 컴퓨트 단계, `module`은 이전 장에서 만든 셰이더 모듈의 핸들입니다. `pName`은 SPIR-V 안의 진입 함수 이름으로, `add.comp`의 `void main()`에 대응합니다. 셰이더 파일명이나 C++의 `main()`을 지정하는 필드가 아닙니다.
+`stage` selects the compute stage, and `module` is the handle of the shader module created in the previous lesson. `pName` names an entry point in SPIR-V, corresponding to `void main()` in `add.comp`. It does not specify the shader filename or C++ `main()`.
 
-이어서 셰이더 단계와 파이프라인 레이아웃을 하나의 생성 정보로 묶습니다.
+Next, combine the shader stage and pipeline layout in one creation information structure.
 
 ```cpp
 vk::ComputePipelineCreateInfo pipelineInfo{};
@@ -119,28 +119,28 @@ pipelineInfo.stage = stageInfo;
 pipelineInfo.layout = *pipelineLayout;
 ```
 
-컴퓨트 파이프라인에는 컴퓨트 셰이더 단계 하나를 지정합니다. 배열 연산을 직접 실행하므로 그래픽스 파이프라인의 정점 입력과 래스터라이제이션 설정이 필요하지 않습니다. 이 예제에서 쓰는 스토리지 버퍼 바인딩과 푸시 상수는 모두 `pipelineInfo.layout`이 설명하는 구조와 일치해야 합니다.
+A compute pipeline specifies one compute shader stage. Since it directly performs array computation, it does not need a graphics pipeline's vertex input or rasterization settings. The storage buffer bindings and push constants used here must all match the structure described by `pipelineInfo.layout`.
 
-이제 RAII 생성자에 논리 디바이스와 생성 정보를 전달합니다.
+Pass the logical device and creation information to the RAII constructor.
 
 ```cpp
 computePipeline = vk::raii::Pipeline(device, nullptr, pipelineInfo); // C API: vkCreateComputePipelines
 ```
 
-두 번째 인수는 파이프라인 캐시입니다. 이 예제에서는 캐시 객체를 사용하지 않으므로 `nullptr`를 전달합니다. 캐시는 파이프라인 생성 결과를 재사용하는 데 쓰이며, 명령을 실행하거나 동기화하는 객체는 아닙니다.
+The second argument is a pipeline cache. This example uses no cache object, so pass `nullptr`. A cache reuses results from pipeline creation; it does not execute or synchronize commands.
 
-함수 마지막에 생성 결과를 출력하고 성공을 반환합니다.
+At the end of the function, print the creation result and return success.
 
 ```cpp
 std::cout << "Compute pipeline created.\n";
 return true;
 ```
 
-셰이더 모듈은 파이프라인 생성에 사용됩니다. 생성이 끝난 뒤에는 해제할 수 있지만, 이 예제에서는 앞 장의 RAII 멤버 구조를 유지해 프로그램 종료 때 함께 정리합니다.
+The shader module is used during pipeline creation. It can be released afterward, but this example keeps the preceding lesson's RAII member structure and releases it when the program exits.
 
-## 초기화 순서에 연결하기
+## Connect the initialization steps
 
-`initVulkan()` 끝의 `&& createShaderModule();` 한 줄을 다음 세 줄로 바꿉니다.
+Replace the final `&& createShaderModule();` line in `initVulkan()` with these three lines.
 
 ```cpp
     && createShaderModule()
@@ -148,11 +148,11 @@ return true;
     && createComputePipeline();
 ```
 
-셰이더 모듈과 파이프라인 레이아웃이 준비된 다음 파이프라인을 생성합니다. 여기까지는 실행할 프로그램과 리소스 구조를 정의한 것입니다. 다음 장에서 이 파이프라인, 디스크립터 셋, 원소 수를 커맨드 버퍼에 기록하겠습니다.
+Create the pipeline after the shader module and pipeline layout are ready. So far, the executable program and resource structure have been defined. The next lesson records this pipeline, the descriptor set, and the element count in a command buffer.
 
-## 빌드와 실행
+## Build and run
 
-[환경 설정](../00-env-settings/README.md)을 마친 뒤, 저장소 루트에서 예제 폴더로 이동합니다.
+After completing [Environment settings](../00-env-settings/README.md), change from the repository root to the example directory.
 
 ```sh
 cd examples/09-compute-pipeline
@@ -160,7 +160,7 @@ cd examples/09-compute-pipeline
 
 ### Windows
 
-Visual Studio 생성기를 기준으로 빌드하고 실행합니다.
+Build and run with the Visual Studio generator.
 
 ```powershell
 cmake -S . -B build
@@ -168,7 +168,7 @@ cmake --build build --config Debug --target compute_pipeline_example
 .\build\Debug\main.exe
 ```
 
-완성본이 있다면 같은 구성에서 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, build and run it with these commands in the same configuration.
 
 ```powershell
 cmake --build build --config Debug --target compute_pipeline_completed
@@ -177,7 +177,7 @@ cmake --build build --config Debug --target compute_pipeline_completed
 
 ### Linux
 
-Makefiles 또는 Ninja를 기준으로 빌드하고 실행합니다.
+Build and run with Makefiles or Ninja.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -185,21 +185,21 @@ cmake --build build --target compute_pipeline_example
 ./build/main
 ```
 
-완성본이 있다면 같은 구성에서 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, build and run it with these commands in the same configuration.
 
 ```sh
 cmake --build build --target compute_pipeline_completed
 ./build/completed/main
 ```
 
-### 실행 결과
+### Expected output
 
-`Shader module created: ... bytes.` 다음에 `Compute pipeline created.`가 출력되는지 확인합니다. 검증 레이어가 셰이더의 바인딩이나 푸시 상수 범위 불일치를 보고한다면, 06장의 바인딩과 이 장의 레이아웃을 `add.comp` 선언에 대조합니다.
+Check that `Compute pipeline created.` appears after `Shader module created: ... bytes.`. If the validation layer reports a shader binding or push constant range mismatch, compare lesson 06's bindings and this lesson's layout with the declarations in `add.comp`.
 
-파이프라인 생성은 연산 실행과 별개입니다. 이번 장에서는 명령을 큐에 제출하지 않으므로 출력 버퍼는 초기값 그대로입니다. 다음 장에서 이 파이프라인을 사용한 명령을 기록합니다.
+Pipeline creation is separate from executing the computation. This lesson submits no commands to the queue, so the output buffer retains its initial values. The next lesson records commands using this pipeline.
 
-이 장의 코드를 완성한 뒤, 실행 결과가 보이도록 터미널을 캡처해 제출합니다.
+After completing the code for this lesson, submit a screenshot of the terminal showing the output.
 
 ---
 
-참고: [VkPipelineLayoutCreateInfo](https://docs.vulkan.org/refpages/latest/refpages/source/VkPipelineLayoutCreateInfo.html), [VkPushConstantRange](https://docs.vulkan.org/refpages/latest/refpages/source/VkPushConstantRange.html), [Vulkan Guide: Push Constants](https://docs.vulkan.org/guide/latest/push_constants.html), [VkComputePipelineCreateInfo](https://docs.vulkan.org/refpages/latest/refpages/source/VkComputePipelineCreateInfo.html).
+References: [VkPipelineLayoutCreateInfo](https://docs.vulkan.org/refpages/latest/refpages/source/VkPipelineLayoutCreateInfo.html), [VkPushConstantRange](https://docs.vulkan.org/refpages/latest/refpages/source/VkPushConstantRange.html), [Vulkan Guide: Push Constants](https://docs.vulkan.org/guide/latest/push_constants.html), [VkComputePipelineCreateInfo](https://docs.vulkan.org/refpages/latest/refpages/source/VkComputePipelineCreateInfo.html).

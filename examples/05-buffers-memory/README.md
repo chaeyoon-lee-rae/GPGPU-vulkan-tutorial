@@ -1,23 +1,23 @@
-# 05. 버퍼와 메모리
+# 05. Buffers and memory
 
-[이전: 논리 디바이스와 큐](../04-logical-device/README.md) · [다음: 디스크립터 셋 레이아웃](../06-descriptor-layout/README.md) · [전체 튜토리얼](../../README.md#튜토리얼)
+[Previous: Logical device and queues](../04-logical-device/README.md) | [Next: Descriptor set layout](../06-descriptor-layout/README.md) | [All tutorials](../../README.md#tutorials)
 
-논리 디바이스와 큐를 만들었으니 연산할 데이터를 준비해 보겠습니다. Vulkan에서 버퍼(Buffer)는 데이터를 담는 리소스이지만, 버퍼를 만드는 것만으로 저장 공간이 할당되지는 않습니다. 버퍼에 맞는 메모리를 찾아 할당하고 연결해야 합니다.
+With the logical device and queue ready, prepare the data for computation. In Vulkan, a buffer is a resource that holds data, but creating a buffer does not allocate storage. Suitable memory must be found, allocated, and bound to the buffer.
 
-이번에는 입력 버퍼 두 개와 출력 버퍼 하나를 만들겠습니다. 각 버퍼에 CPU로 값을 기록하고 다시 읽어 확인하는 것까지 진행합니다. GPU에서 이 값을 연산하는 과정은 이후 장에서 이어집니다.
+Create two input buffers and one output buffer. Write values to each buffer from the CPU, then read them back to verify them. Later lessons use the GPU to compute with these values.
 
-[main.cpp](main.cpp)를 열고 아래 순서대로 작성해 보겠습니다. 완성된 코드는 공개 후 `examples/99-completed/05-buffers-memory.cpp`에서 확인할 수 있습니다.
+Open [main.cpp](main.cpp) and follow the steps below. Once published, the completed code is available in `examples/99-completed/05-buffers-memory.cpp`.
 
-## 버퍼 크기와 보관할 자리 만들기
+## Set the buffer size and add storage members
 
-입력값과 읽어 온 값을 배열에 담기 위해 `<array>`가 필요합니다. 복사할 바이트 수에는 `size_t`를 사용하므로 `<stddef.h>`도 추가합니다. 파일 위쪽에 다음 헤더를 추가합니다.
+`<array>` is needed to hold the input and readback values. Add `<stddef.h>` for `size_t`, which specifies the number of bytes to copy. Add these headers at the top of the file.
 
 ```cpp
 #include <array>
 #include <stddef.h>
 ```
 
-각 버퍼에는 4바이트 `float` 값 8개를 담겠습니다. `private` 영역의 `validationLayer` 다음에 원소 개수와 버퍼 크기를 적습니다.
+Each buffer will hold eight 4-byte `float` values. In the `private` section, after `validationLayer`, define the element count and buffer size.
 
 ```cpp
 static_assert(sizeof(float) == 4);
@@ -25,9 +25,9 @@ static constexpr uint32_t elementCount = 8;
 static constexpr vk::DeviceSize bufferSize = sizeof(float) * elementCount;
 ```
 
-`bufferSize`는 원소 하나의 크기에 개수를 곱한 바이트 크기입니다. `static_assert`는 이 예제에서 사용할 `float`의 크기를 컴파일할 때 확인합니다.
+`bufferSize` is the size in bytes of one element multiplied by the element count. `static_assert` checks the size of `float` at compile time.
 
-버퍼마다 버퍼 객체와 메모리 객체를 함께 보관할 수 있도록, 바로 아래에 구조체를 추가합니다.
+Directly below, add a structure to hold each buffer object together with its memory object.
 
 ```cpp
 struct BufferResource
@@ -37,9 +37,9 @@ struct BufferResource
 };
 ```
 
-멤버는 선언의 역순으로 소멸합니다. `memory`를 먼저 선언했으므로 `buffer`를 해제한 다음 연결된 메모리를 해제하게 됩니다.
+Members are destroyed in reverse declaration order. Declaring `memory` first ensures that `buffer` is destroyed before the memory bound to it.
 
-이제 `computeQueue` 아래에 입력 두 개와 출력 하나를 담을 멤버를 추가합니다.
+Below `computeQueue`, add members for the two input buffers and one output buffer.
 
 ```cpp
 BufferResource inputA;
@@ -47,9 +47,9 @@ BufferResource inputB;
 BufferResource output;
 ```
 
-## 버퍼 객체 만들기
+## Create a buffer object
 
-입력과 출력 버퍼는 같은 방식으로 만들 수 있습니다. 클래스의 `private` 영역 끝에 버퍼 하나를 생성할 함수의 틀을 추가합니다. `size`로 바이트 크기를 받고, 생성한 객체는 참조로 받은 `resource`에 저장하겠습니다.
+Input and output buffers can be created in the same way. Add an empty function for creating one buffer at the end of the class's `private` section. It takes the byte size in `size` and stores the created objects in `resource`, which is passed by reference.
 
 ```cpp
 bool createBuffer(vk::DeviceSize size, BufferResource& resource)
@@ -57,7 +57,7 @@ bool createBuffer(vk::DeviceSize size, BufferResource& resource)
 }
 ```
 
-먼저 함수 안에서 버퍼의 크기와 용도를 정합니다. 컴퓨트 셰이더가 읽고 쓸 데이터를 담을 것이므로 용도는 `eStorageBuffer`로 지정합니다.
+First, set the buffer size and usage inside the function. Use `eStorageBuffer` because the buffer will hold data that a compute shader reads and writes.
 
 ```cpp
 vk::BufferCreateInfo bufferInfo{};
@@ -66,40 +66,40 @@ bufferInfo.usage = vk::BufferUsageFlagBits::eStorageBuffer;
 bufferInfo.sharingMode = vk::SharingMode::eExclusive;
 ```
 
-`sharingMode`는 큐 패밀리 사이에서 리소스를 공유하는 방식입니다. 이 예제에서는 앞에서 선택한 하나의 패밀리만 사용하므로 `eExclusive`로 둡니다.
+`sharingMode` specifies how the resource is shared between queue families. This example uses only the previously selected family, so set it to `eExclusive`.
 
-생성 정보를 준비했으니 그 아래에서 버퍼 객체를 만듭니다.
+With the creation information ready, create the buffer object below it.
 
 ```cpp
 resource.buffer = vk::raii::Buffer(device, bufferInfo); // C API: vkCreateBuffer
 ```
 
-여기까지는 버퍼 객체만 만들었습니다. 실제 데이터를 담으려면 이 버퍼가 사용할 수 있는 메모리를 연결해야 합니다.
+Only the buffer object has been created so far. To store data, it must be bound to memory that the buffer can use.
 
-## 버퍼가 요구하는 메모리 확인하기
+## Check the buffer's memory requirements
 
-메모리를 할당하기 전에 드라이버가 요구하는 크기와 메모리 타입을 알아야 합니다. 버퍼 생성 다음 줄에서 요구사항을 가져옵니다.
+Before allocating memory, find the size and memory types required by the driver. Retrieve the requirements on the line after buffer creation.
 
 ```cpp
 const auto requirements = resource.buffer.getMemoryRequirements(); // C API: vkGetBufferMemoryRequirements
 ```
 
-`requirements.size`는 실제로 할당해야 하는 크기로, 처음 요청한 버퍼 크기보다 클 수 있습니다. `alignment`는 메모리를 연결할 오프셋의 정렬 조건이고, `memoryTypeBits`는 버퍼에 사용할 수 있는 메모리 타입을 비트로 표시한 값입니다.
+`requirements.size` is the size that must actually be allocated and may exceed the requested buffer size. `alignment` is the alignment required for the memory binding offset. `memoryTypeBits` identifies the memory types allowed for this buffer using bits.
 
-버퍼가 허용하는 유형 중에서도 CPU가 직접 값을 기록할 수 있는 메모리를 골라야 합니다. 조회 코드 아래에 필요한 속성을 적습니다.
+Among the types allowed by the buffer, select memory that the CPU can write directly. Specify the required properties below the query.
 
 ```cpp
 const auto properties = vk::MemoryPropertyFlagBits::eHostVisible
     | vk::MemoryPropertyFlagBits::eHostCoherent;
 ```
 
-`eHostVisible`은 메모리를 매핑해 CPU에서 접근할 수 있다는 뜻입니다. `eHostCoherent`는 CPU 접근에 필요한 캐시의 flush와 invalidate를 명시적으로 호출하지 않아도 된다는 뜻입니다. GPU 작업의 완료를 기다려 주는 속성은 아닙니다.
+`eHostVisible` means that the memory can be mapped for CPU access. `eHostCoherent` means that explicit cache flush and invalidate calls are not required for CPU access. It does not wait for GPU work to complete.
 
-이제 버퍼가 허용하면서 이 두 속성도 갖춘 메모리 타입을 찾아야 합니다. 검색 함수를 먼저 작성한 뒤 여기서 호출하겠습니다.
+Find a memory type that is allowed by the buffer and has both properties. Write the search function first, then call it here.
 
-## 사용할 메모리 타입 찾기
+## Find a suitable memory type
 
-잠시 `createBuffer()`에서 나와 그 아래에 다음 함수의 틀을 추가합니다.
+Outside `createBuffer()`, add this empty function below it.
 
 ```cpp
 bool findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties,
@@ -108,41 +108,41 @@ bool findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties,
 }
 ```
 
-`typeFilter`에는 버퍼가 허용하는 유형을, `properties`에는 프로그램이 원하는 속성을 전달합니다. 조건에 맞는 유형을 찾으면 `typeIndex`에 인덱스를 저장하고 `true`를 반환하도록 만들겠습니다.
+`typeFilter` specifies the types allowed by the buffer, and `properties` specifies the properties the program needs. When a suitable type is found, store its index in `typeIndex` and return `true`.
 
-먼저 함수 안에서 물리 디바이스의 메모리 타입 정보를 조회합니다.
+First, query the physical device's memory types inside the function.
 
 ```cpp
 const auto memoryProperties = physicalDevice.getMemoryProperties(); // C API: vkGetPhysicalDeviceMemoryProperties
 ```
 
-유형마다 지원하는 속성이 다를 수 있으므로, 목록을 순서대로 검사합니다. 조회 코드 아래에 반복문의 틀을 추가합니다.
+Properties may differ between types, so check the list in order. Add this empty loop below the query.
 
 ```cpp
 for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; ++i)
 {
-    // 버퍼의 조건과 필요한 메모리 속성을 검사합니다.
+    // Check the buffer requirements and required memory properties.
 }
 ```
 
-반복문 안에서 먼저 이 버퍼가 `i`번 메모리 타입을 허용하는지 확인합니다. 주석을 지우고 다음 줄을 넣습니다.
+Inside the loop, first check whether this buffer allows memory type `i`. Replace the comment with this line.
 
 ```cpp
 const bool allowed = (typeFilter & (1u << i)) != 0;
 ```
 
-`1u << i`는 `i`번째 비트만 켠 값입니다. `typeFilter`의 같은 비트가 켜져 있다면 이 버퍼에 해당 유형을 사용할 수 있습니다.
+`1u << i` has only bit `i` set. If the same bit is set in `typeFilter`, that memory type is allowed for this buffer.
 
-버퍼가 허용한다고 CPU 접근도 가능한 것은 아닙니다. 바로 아래에서 이 유형이 우리가 요청한 속성을 모두 갖췄는지 검사합니다.
+An allowed type does not necessarily support CPU access. Directly below, check whether this type has all the requested properties.
 
 ```cpp
 const bool hasProperties =
     (memoryProperties.memoryTypes[i].propertyFlags & properties) == properties;
 ```
 
-`properties`에는 `eHostVisible`과 `eHostCoherent`를 함께 넣을 예정입니다. 비트 연산 결과가 `properties`와 같아야 요청한 속성이 모두 포함돼 있다는 뜻입니다.
+`properties` will contain both `eHostVisible` and `eHostCoherent`. The bitwise result must equal `properties` for all requested properties to be present.
 
-두 조건을 통과하면 그 유형의 인덱스를 저장하고 검색을 끝냅니다. 같은 반복문 안에 이어서 추가합니다.
+If both conditions pass, save the type index and finish the search. Add this inside the same loop.
 
 ```cpp
 if (allowed && hasProperties)
@@ -152,14 +152,14 @@ if (allowed && hasProperties)
 }
 ```
 
-반복문을 끝까지 통과했다면 조건에 맞는 유형을 찾지 못했습니다. 반복문 밖, 함수 마지막에 실패 처리를 추가합니다.
+Reaching the end of the loop means that no suitable type was found. Add failure handling outside the loop, at the end of the function.
 
 ```cpp
 std::cerr << "No compatible HOST_VISIBLE | HOST_COHERENT memory type found.\n";
 return false;
 ```
 
-검색 함수가 완성됐습니다. `createBuffer()`로 돌아가 `properties`를 선언한 다음에 호출을 추가합니다.
+The search function is complete. Return to `createBuffer()` and call it after declaring `properties`.
 
 ```cpp
 uint32_t memoryTypeIndex = 0;
@@ -169,16 +169,16 @@ if (!findMemoryType(requirements.memoryTypeBits, properties, memoryTypeIndex))
 }
 ```
 
-검색에 실패하면 이 버퍼의 초기화를 중단합니다. 성공했다면 `memoryTypeIndex`에 사용할 유형의 인덱스가 들어 있으므로 메모리 할당으로 진행할 수 있습니다.
+If the search fails, stop initializing this buffer. On success, `memoryTypeIndex` holds the selected type's index, so memory allocation can proceed.
 
 > [!NOTE]
-> **생각해볼 점**
+> **Questions to consider**
 >
-> `eHostVisible`, `eHostCoherent`, `eDeviceLocal`은 각각 무엇을 보장하나요? `eHostVisible`과 `eDeviceLocal`을 동시에 가진 메모리 타입이 있는지 자신의 GPU에서 확인해 보세요. 외장 GPU에서 `eDeviceLocal`만 있는 경우, `eHostVisible`만 있는 경우, 두 속성이 모두 있는 경우에 메모리는 각각 어디에 할당될까요?
+> What do `eHostVisible`, `eHostCoherent`, and `eDeviceLocal` each guarantee? Check whether your GPU has a memory type with both `eHostVisible` and `eDeviceLocal`. On a discrete GPU, where is memory allocated when it has only `eDeviceLocal`, only `eHostVisible`, or both properties?
 
-## 메모리 할당하고 버퍼에 연결하기
+## Allocate memory and bind it to the buffer
 
-같은 함수의 방금 작성한 `if`문 아래에서 할당 정보를 만듭니다. 크기에는 드라이버가 알려 준 `requirements.size`를, 유형에는 검색 결과를 넣습니다.
+In the same function, create the allocation information below the new `if` statement. Use the driver's `requirements.size` for the size and the search result for the type.
 
 ```cpp
 vk::MemoryAllocateInfo allocationInfo{};
@@ -186,21 +186,21 @@ allocationInfo.allocationSize = requirements.size;
 allocationInfo.memoryTypeIndex = memoryTypeIndex;
 ```
 
-이어서 메모리를 할당하고 `resource`에 보관합니다.
+Next, allocate the memory and store it in `resource`.
 
 ```cpp
 resource.memory = vk::raii::DeviceMemory(device, allocationInfo); // C API: vkAllocateMemory
 ```
 
-버퍼와 메모리가 각각 만들어졌으니 이제 둘을 연결합니다.
+With both the buffer and memory created, bind them together.
 
 ```cpp
 resource.buffer.bindMemory(*resource.memory, 0); // C API: vkBindBufferMemory
 ```
 
-두 번째 인수는 할당된 메모리 안에서 버퍼가 시작할 바이트 오프셋입니다. 버퍼마다 별도의 메모리를 할당했으므로 처음 위치인 0을 사용합니다. 0은 버퍼의 정렬 조건도 만족합니다.
+The second argument is the byte offset at which the buffer starts within the allocation. Each buffer has a separate allocation, so use 0, the start of that allocation. This also satisfies the buffer's alignment requirement.
 
-함수 마지막에는 선택한 메모리 정보를 출력하고 성공을 반환합니다.
+At the end of the function, print the selected memory information and return success.
 
 ```cpp
 std::cout << "Buffer memory: size " << requirements.size
@@ -210,13 +210,13 @@ return true;
 ```
 
 > [!NOTE]
-> **생각해볼 점**
+> **Questions to consider**
 >
-> 버퍼 생성, 메모리 할당, `bindMemory()`는 각각 무엇을 하나요? Vulkan이 이 세 단계를 나눈 이유는 무엇일까요? CUDA의 `cudaMalloc()`과 비교해 보세요.
+> What do buffer creation, memory allocation, and `bindMemory()` each do? Why does Vulkan separate these three steps? Compare them with CUDA's `cudaMalloc()`.
 
-## CPU에서 값 기록하기
+## Write values from the CPU
 
-버퍼와 메모리를 준비했으니 실제로 값을 넣어 보겠습니다. `findMemoryType()` 아래에 기록과 확인을 담당할 함수의 틀을 추가합니다.
+With the buffer and memory ready, write values to them. Below `findMemoryType()`, add an empty function to write and verify the data.
 
 ```cpp
 bool writeAndVerifyBuffer(BufferResource& resource,
@@ -226,26 +226,26 @@ bool writeAndVerifyBuffer(BufferResource& resource,
 }
 ```
 
-`resource`는 기록할 버퍼, `values`는 기록할 값입니다. `label`은 출력할 때 입력 A와 입력 B 등을 구분하는 이름으로 사용합니다.
+`resource` is the buffer to write, and `values` contains the data. `label` distinguishes buffers such as input A and input B in the output.
 
-CPU에서 메모리에 접근하려면 먼저 매핑해야 합니다. 함수의 첫 줄에서 버퍼 크기만큼 매핑합니다.
+Memory must be mapped before the CPU can access it. On the first line of the function, map a range equal to the buffer size.
 
 ```cpp
 void* mapped = resource.memory.mapMemory(0, bufferSize); // C API: vkMapMemory
 ```
 
-`mapMemory()`가 반환한 주소를 통해 CPU가 메모리에 접근할 수 있습니다. 이 주소로 배열의 바이트를 복사하고, 사용을 마쳤으면 매핑을 해제합니다.
+The CPU can access memory through the address returned by `mapMemory()`. Copy the array's bytes to that address, then unmap the memory when finished.
 
 ```cpp
 std::memcpy(mapped, values.data(), static_cast<size_t>(bufferSize));
 resource.memory.unmapMemory(); // C API: vkUnmapMemory
 ```
 
-`std::memcpy`에 필요한 `<cstring>`은 시작 코드에 포함되어 있습니다. `unmapMemory()`는 CPU 주소로의 매핑을 해제하는 것이며, 메모리 자체나 기록한 값을 없애지 않습니다.
+The starter code already includes `<cstring>`, which provides `std::memcpy`. `unmapMemory()` removes the mapping to a CPU address; it does not free the memory or erase the stored values.
 
-## 기록한 값 다시 읽기
+## Read the values back
 
-기록이 됐는지 확인하기 위해 같은 메모리를 다시 매핑하고 별도 배열로 읽겠습니다. 방금 작성한 `unmapMemory()` 아래에 다음 코드를 추가합니다.
+To verify the write, map the same memory again and read it into a separate array. Add this code below the `unmapMemory()` call just written.
 
 ```cpp
 std::array<float, elementCount> readback{};
@@ -254,9 +254,9 @@ std::memcpy(readback.data(), mapped, static_cast<size_t>(bufferSize));
 resource.memory.unmapMemory(); // C API: vkUnmapMemory
 ```
 
-이번에는 복사 방향이 반대입니다. 버퍼의 메모리에서 CPU 배열인 `readback`으로 값을 가져왔습니다.
+The copy direction is reversed this time. Values move from the buffer's memory into the CPU array `readback`.
 
-바로 아래에서 읽어 온 배열을 원래 값과 비교합니다. 다르면 어떤 버퍼에서 문제가 생겼는지 출력하고 실패를 반환합니다.
+Directly below, compare the readback array with the original values. If they differ, print which buffer failed and return failure.
 
 ```cpp
 if (readback != values)
@@ -266,7 +266,7 @@ if (readback != values)
 }
 ```
 
-값이 같다면 읽은 배열을 출력해 눈으로도 확인하겠습니다. 함수 마지막에 다음 코드를 추가합니다.
+If the values match, print the array for visual inspection. Add this code at the end of the function.
 
 ```cpp
 std::cout << label << ':';
@@ -278,16 +278,16 @@ std::cout << '\n';
 return true;
 ```
 
-여기서는 CPU가 기록한 값을 CPU에서 다시 읽었습니다. 아직 GPU 작업을 제출하지 않았으므로 큐 제출이나 GPU 완료 대기 코드는 필요하지 않습니다.
+Here, the CPU reads back values it wrote itself. No GPU work has been submitted, so queue submission and GPU completion waits are not needed yet.
 
 > [!NOTE]
-> **생각해볼 점**
+> **Questions to consider**
 >
-> `mapMemory()`, `memcpy()`, `unmapMemory()`는 각각 무엇을 하나요? 매핑을 해제한 뒤에도 기록한 값과 반환받았던 포인터를 사용할 수 있나요? CPU가 쓴 값 대신 GPU가 계산한 결과를 읽는다면, `eHostCoherent`만으로 충분할까요?
+> What do `mapMemory()`, `memcpy()`, and `unmapMemory()` each do? After unmapping, can the stored values and the returned pointer still be used? If the CPU reads results computed by the GPU instead of values it wrote itself, is `eHostCoherent` alone enough?
 
-## 입력과 출력 버퍼 준비하기
+## Prepare the input and output buffers
 
-버퍼를 생성하는 함수와 값을 기록하는 함수가 모두 준비됐습니다. 이제 이 함수들을 사용해 입력 두 개와 출력 하나를 만들겠습니다. `createBuffer()` 앞에 다음 함수의 틀을 추가합니다.
+The buffer creation and data writing functions are ready. Use them to create two input buffers and one output buffer. Add this empty function before `createBuffer()`.
 
 ```cpp
 bool createStorageBuffers()
@@ -295,13 +295,13 @@ bool createStorageBuffers()
 }
 ```
 
-함수 안에 생성할 버퍼들의 주소를 모읍니다. 배열 크기는 나열한 원소에서 결정되며, 뒤에서 생성한 버퍼 개수를 출력할 때도 이 배열을 사용하겠습니다.
+Inside the function, collect the addresses of the buffers to create. The array size is deduced from its elements. This array will also be used to print the number of created buffers.
 
 ```cpp
 const std::array buffers = {&inputA, &inputB, &output};
 ```
 
-이제 배열을 순회하며 각 버퍼와 메모리를 만듭니다. 하나라도 실패하면 이후 초기화로 진행하지 않습니다.
+Loop over the array and create each buffer and its memory. If any creation fails, stop before further initialization.
 
 ```cpp
 for (auto* buffer : buffers)
@@ -313,7 +313,7 @@ for (auto* buffer : buffers)
 }
 ```
 
-버퍼를 만들었으니 기록할 값을 준비하겠습니다. 반복문 아래에 입력 배열 두 개와 출력 초기값 배열을 만듭니다.
+With the buffers created, prepare the values to write. Below the loop, create two input arrays and an array of initial output values.
 
 ```cpp
 std::array<float, elementCount> valuesA{};
@@ -321,7 +321,7 @@ std::array<float, elementCount> valuesB{};
 const std::array<float, elementCount> initialOutput{};
 ```
 
-`{}`로 초기화한 원소는 모두 0입니다. 출력 배열은 이대로 두고, 입력 A에는 0부터 7까지, B에는 10부터 17까지 넣겠습니다.
+Elements initialized with `{}` are all zero. Leave the output array as it is, and fill input A with 0 through 7 and input B with 10 through 17.
 
 ```cpp
 for (uint32_t i = 0; i < elementCount; ++i)
@@ -331,7 +331,7 @@ for (uint32_t i = 0; i < elementCount; ++i)
 }
 ```
 
-값을 준비했으니 반복문 다음에서 각 배열을 해당 버퍼에 기록하고 확인합니다.
+After preparing the values, write each array to its buffer and verify it below the loop.
 
 ```cpp
 if (!writeAndVerifyBuffer(inputA, valuesA, "Input A")
@@ -342,7 +342,7 @@ if (!writeAndVerifyBuffer(inputA, valuesA, "Input A")
 }
 ```
 
-각 호출은 데이터를 기록하고 다시 읽어 비교합니다. 모두 성공했다면 함수 마지막에서 준비가 끝났음을 출력합니다.
+Each call writes data, reads it back, and compares it. If all calls succeed, print a completion message at the end of the function.
 
 ```cpp
 std::cout << "Host-visible storage buffers ready: " << buffers.size()
@@ -351,9 +351,9 @@ std::cout << "Host-visible storage buffers ready: " << buffers.size()
 return true;
 ```
 
-## 초기화 순서에 연결하기
+## Connect the initialization steps
 
-`createStorageBuffers()`가 완성됐으니 실제 초기화에 연결하겠습니다. 버퍼와 메모리는 논리 디바이스를 통해 생성하므로, `initVulkan()`의 마지막에 호출을 추가합니다.
+With `createStorageBuffers()` complete, connect it to initialization. Buffers and memory are created through the logical device, so add the call at the end of `initVulkan()`.
 
 ```cpp
 bool initVulkan()
@@ -366,11 +366,11 @@ bool initVulkan()
 }
 ```
 
-버퍼 멤버를 `device` 뒤에 선언했으므로 버퍼와 메모리가 디바이스보다 먼저 정리됩니다. 다음 장에서는 이 버퍼들을 셰이더에 어떻게 연결할지 정하는 디스크립터 셋 레이아웃을 만들겠습니다.
+The buffer members are declared after `device`, so the buffers and memory are released before the device. The next lesson creates a descriptor set layout to specify how these buffers connect to the shader.
 
-## 빌드와 실행
+## Build and run
 
-[환경 설정](../00-env-settings/README.md)을 마친 뒤, 저장소 루트에서 이 예제 폴더로 이동합니다.
+After completing [Environment settings](../00-env-settings/README.md), change from the repository root to this example directory.
 
 ```sh
 cd examples/05-buffers-memory
@@ -378,7 +378,7 @@ cd examples/05-buffers-memory
 
 ### Windows
 
-Visual Studio 생성기를 기준으로 빌드하고 실행합니다.
+Build and run with the Visual Studio generator.
 
 ```powershell
 cmake -S . -B build
@@ -386,7 +386,7 @@ cmake --build build --config Debug --target buffers_memory_example
 .\build\Debug\main.exe
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```powershell
 cmake --build build --config Debug --target buffers_memory_completed
@@ -395,7 +395,7 @@ cmake --build build --config Debug --target buffers_memory_completed
 
 ### Linux
 
-Makefiles 또는 Ninja를 기준으로 빌드하고 실행합니다.
+Build and run with Makefiles or Ninja.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -403,19 +403,19 @@ cmake --build build --target buffers_memory_example
 ./build/main
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```sh
 cmake --build build --target buffers_memory_completed
 ./build/completed/main
 ```
 
-### 실행 결과
+### Expected output
 
-입력 버퍼를 다시 읽은 값이 코드에서 준비한 배열과 같은지 확인합니다. 출력 버퍼의 초기값과 버퍼당 바이트 크기도 직접 계산한 값과 비교해 보세요. 메모리 타입과 정렬 크기는 장치에 따라 달라집니다.
+Check that the values read from the input buffers match the arrays prepared in the code. Compare the output buffer's initial values and the byte size per buffer with your own calculations. The memory type and alignment depend on the device.
 
-이 장의 코드를 완성한 뒤, 실행 결과가 보이도록 터미널을 캡처해 제출합니다.
+After completing the code for this lesson, submit a screenshot of the terminal showing the output.
 
 ---
 
-이 문서는 [Khronos Vulkan Tutorial: Vertex buffer creation](https://docs.vulkan.org/tutorial/latest/04_Vertex_buffers/01_Vertex_buffer_creation.html)을 컴퓨트용 스토리지 버퍼의 할당·매핑 실습에 맞게 번역·각색했습니다. 원문과 이 문서는 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)을 따릅니다.
+This document was translated and adapted from [Khronos Vulkan Tutorial: Vertex buffer creation](https://docs.vulkan.org/tutorial/latest/04_Vertex_buffers/01_Vertex_buffer_creation.html) for exercises in allocating and mapping storage buffers for compute. The original material and this document are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

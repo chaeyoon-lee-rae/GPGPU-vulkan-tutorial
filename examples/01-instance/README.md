@@ -1,14 +1,14 @@
-# 01. 인스턴스 생성과 해제
+# 01. Create and destroy an instance
 
-[이전: 환경 설정](../00-env-settings/README.md) · [다음: 검증 레이어](../02-validation-layers/README.md) · [전체 튜토리얼](../../README.md#튜토리얼)
+[Previous: Environment settings](../00-env-settings/README.md) | [Next: Validation layers](../02-validation-layers/README.md) | [All tutorials](../../README.md#tutorials)
 
-Vulkan을 사용하려면 먼저 인스턴스(Instance)를 생성해야 합니다. 인스턴스는 애플리케이션과 Vulkan 라이브러리를 연결합니다. 생성할 때 프로그램 정보와 사용할 API 버전을 전달해 보겠습니다.
+To use Vulkan, first create an instance. The instance connects the application to the Vulkan library. When creating it, provide information about the program and the API version it will use.
 
-[main.cpp](main.cpp)를 열고 아래 설명을 따라 코드를 채워 보겠습니다. 완성된 코드는 공개 후 `examples/99-completed/01-instance.cpp`에서 확인할 수 있습니다.
+Open [main.cpp](main.cpp) and fill in the code by following the instructions below. Once published, the completed code is available in `examples/99-completed/01-instance.cpp`.
 
-## 초기화가 시작되는 곳 살펴보기
+## Find where initialization starts
 
-시작 코드의 `main()`은 `ComputeApplication` 객체를 만들고 `app.run()`을 호출합니다. 클래스의 `public` 영역에 있는 `run()`을 보면 초기화 함수를 호출하고 있습니다.
+In the starter code, `main()` creates a `ComputeApplication` object and calls `app.run()`. The `run()` function in the class's `public` section calls the initialization function.
 
 ```cpp
 void run()
@@ -17,20 +17,20 @@ void run()
 }
 ```
 
-`initVulkan()` 안은 아직 비어 있습니다. 앞으로 Vulkan 객체를 하나씩 만들 때마다 이 함수에 초기화 단계를 연결하겠습니다. 우선 인스턴스를 생성할 준비부터 합니다.
+The body of `initVulkan()` is still empty. As each Vulkan object is added, connect its initialization step to this function. Start by preparing to create an instance.
 
-## 인스턴스를 보관할 자리 만들기
+## Add a member to hold the instance
 
-인스턴스는 생성 함수가 끝난 뒤에도 사용할 수 있어야 합니다. `private` 바로 아래에 다음 멤버를 추가합니다.
+The instance must remain available after the creation function returns. Add these members directly below `private`.
 
 ```cpp
 vk::raii::Context context;
 vk::raii::Instance instance = nullptr;
 ```
 
-`context`는 Vulkan 로더를 통해 인스턴스 생성에 필요한 함수에 접근하게 해 줍니다. `instance`는 아직 생성하지 않았으므로 `nullptr`로 초기화합니다.
+`context` provides access to the functions needed to create an instance through the Vulkan loader. Initialize `instance` to `nullptr` because it has not been created yet.
 
-이어서 `private` 영역에 인스턴스 생성 함수의 틀을 추가합니다. 이제부터 나오는 코드는 이 함수 안에 순서대로 작성합니다.
+Next, add an empty instance creation function in the `private` section. Write the following code inside this function in order.
 
 ```cpp
 void createInstance()
@@ -38,9 +38,9 @@ void createInstance()
 }
 ```
 
-## 애플리케이션 정보 작성하기
+## Set the application information
 
-드라이버에 어떤 프로그램이 Vulkan을 사용하는지 알려주겠습니다. `createInstance()` 안에 `vk::ApplicationInfo`를 만들고 프로그램의 이름과 버전을 넣습니다.
+Tell the driver which program is using Vulkan. Inside `createInstance()`, create a `vk::ApplicationInfo` structure and set the program's name and version.
 
 ```cpp
 vk::ApplicationInfo appInfo{};
@@ -48,32 +48,32 @@ appInfo.pApplicationName = "01-instance";
 appInfo.applicationVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
 ```
 
-`VK_MAKE_API_VERSION(0, 1, 0, 0)`은 variant 0의 버전 1.0.0을 하나의 정수로 만듭니다. 여기에 적는 버전은 우리가 만드는 프로그램의 버전입니다.
+`VK_MAKE_API_VERSION(0, 1, 0, 0)` packs version 1.0.0 with variant 0 into a single integer. This is the version of the program being written.
 
-같은 구조체에 엔진 정보도 이어서 넣습니다. 별도의 엔진을 사용하지 않으므로 이름은 `"No Engine"`으로 두겠습니다.
+Continue by adding engine information to the same structure. Set the name to `"No Engine"` because this example does not use a separate engine.
 
 ```cpp
 appInfo.pEngineName = "No Engine";
 appInfo.engineVersion = VK_MAKE_API_VERSION(0, 1, 0, 0);
 ```
 
-프로그램 버전과 별개로, 사용할 Vulkan API 버전도 지정해야 합니다. 이 튜토리얼은 Vulkan 1.3을 사용합니다.
+The Vulkan API version must also be set, independently of the program version. This tutorial uses Vulkan 1.3.
 
 ```cpp
 appInfo.apiVersion = VK_API_VERSION_1_3;
 ```
 
-구조체의 종류를 나타내는 `sType`은 Vulkan-Hpp가 설정하므로 직접 적지 않습니다.
+Vulkan-Hpp sets `sType`, which identifies the structure type, so it does not need to be set manually.
 
-## 사용 가능한 확장 살펴보기
+## Examine the available extensions
 
-확장(Extension)은 Vulkan에 기능을 추가하는 방법입니다. 인스턴스를 만들기 전에 시스템에서 제공하는 인스턴스 확장을 조회해 보겠습니다. `appInfo` 설정 아래에 다음 코드를 추가합니다.
+Extensions add features to Vulkan. Before creating the instance, query the instance extensions available on the system. Add this code below the `appInfo` settings.
 
 ```cpp
 const auto extensions = context.enumerateInstanceExtensionProperties(); // C API: vkEnumerateInstanceExtensionProperties
 ```
 
-반환된 목록의 각 항목에는 확장 이름이 들어 있습니다. 조회 코드 아래에서 목록을 순회하며 `extensionName`을 출력합니다.
+Each entry in the returned list contains an extension name. Below the query, loop through the list and print `extensionName`.
 
 ```cpp
 std::cout << "Available instance extensions:\n";
@@ -83,31 +83,31 @@ for (const auto& extension : extensions)
 }
 ```
 
-여기까지는 사용할 수 있는 확장을 조회한 것입니다. 실제로 확장을 사용하려면 인스턴스 생성 정보에 이름을 지정해야 합니다. 이 장은 창 없이 인스턴스만 만들므로 확장을 요청하지 않고 진행하겠습니다.
+This only lists the available extensions. To use an extension, its name must be specified in the instance creation information. This lesson creates an instance without a window, so proceed without requesting extensions.
 
-## 생성 정보에 애플리케이션 정보 연결하기
+## Connect the application information to the creation information
 
-Vulkan은 객체를 만들 때 필요한 설정을 생성 정보 구조체로 받습니다. 확장 목록 반복문 아래에 `vk::InstanceCreateInfo`를 추가합니다.
+Vulkan receives object settings through a creation information structure. Add `vk::InstanceCreateInfo` below the loop over the extensions.
 
 ```cpp
 vk::InstanceCreateInfo createInfo{};
 createInfo.pApplicationInfo = &appInfo;
 ```
 
-`pApplicationInfo`에 앞에서 작성한 `appInfo`의 주소를 연결했습니다. 이 구조체에는 사용할 확장과 레이어의 이름 목록도 지정할 수 있습니다. 지금은 둘 다 요청하지 않으므로 개수는 기본값인 0으로 둡니다. 레이어는 다음 장에서 추가하겠습니다.
+`pApplicationInfo` now points to the `appInfo` structure prepared above. This structure can also specify the names of extensions and layers to enable. Neither is requested yet, so leave both counts at their default of 0. Layers are added in the next lesson.
 
-## 인스턴스 생성하고 초기화에 연결하기
+## Create the instance and connect it to initialization
 
-생성 정보가 준비됐으니 `context`와 `createInfo`를 전달해 인스턴스를 만듭니다. 생성 정보 설정 바로 아래에 추가합니다.
+With the creation information ready, pass `context` and `createInfo` to create the instance. Add this directly below the creation information settings.
 
 ```cpp
 instance = vk::raii::Instance(context, createInfo); // C API: vkCreateInstance
 std::cout << "Instance created.\n";
 ```
 
-생성한 객체를 멤버인 `instance`에 저장했습니다. 생성이 성공하면 다음 줄의 메시지가 출력됩니다. 이제 `createInstance()`가 완성됐습니다.
+The created object is stored in the `instance` member. If creation succeeds, the next line prints a message. This completes `createInstance()`.
 
-이 함수가 실행되도록 기존 `initVulkan()`에 호출 코드를 추가합니다.
+Add a call to the existing `initVulkan()` function so that the creation function runs.
 
 ```cpp
 void initVulkan()
@@ -116,17 +116,17 @@ void initVulkan()
 }
 ```
 
-프로그램을 시작하면 `main()` → `run()` → `initVulkan()` → `createInstance()` 순서로 실행됩니다.
+When the program starts, execution follows `main()`, `run()`, `initVulkan()`, and `createInstance()` in that order.
 
-## 인스턴스가 해제되는 시점 확인하기
+## Check when the instance is destroyed
 
-`vk::raii` 객체는 수명이 끝날 때 자신이 관리하는 Vulkan 리소스를 해제합니다. 시작 코드의 `main()`에는 `app`을 감싼 안쪽 블록과 종료 출력이 준비되어 있습니다. 이 블록이 끝나면 멤버가 선언의 역순으로 소멸하므로 인스턴스가 먼저 해제되고, 그 뒤에 `Instance destroyed.`가 출력됩니다.
+A `vk::raii` object releases the Vulkan resource it manages when its lifetime ends. In the starter code, `main()` already contains an inner block around `app` and a final output statement. At the end of this block, members are destroyed in reverse declaration order. The instance is destroyed before `Instance destroyed.` is printed.
 
-다음 장에서는 Vulkan 사용 중 생기는 경고와 오류를 받을 검증 레이어를 추가하겠습니다.
+The next lesson adds validation layers to receive warnings and errors from Vulkan usage.
 
-## 빌드와 실행
+## Build and run
 
-[환경 설정](../00-env-settings/README.md)을 마친 뒤, 작성한 `main.cpp`를 빌드해 보겠습니다. 저장소 루트에서 이 예제 폴더로 이동합니다.
+After completing [Environment settings](../00-env-settings/README.md), build the `main.cpp` you have written. Change from the repository root to this example directory.
 
 ```sh
 cd examples/01-instance
@@ -134,7 +134,7 @@ cd examples/01-instance
 
 ### Windows
 
-Visual Studio 생성기를 기준으로 빌드하고 실행합니다.
+Build and run with the Visual Studio generator.
 
 ```powershell
 cmake -S . -B build
@@ -142,7 +142,7 @@ cmake --build build --config Debug --target instance_example
 .\build\Debug\main.exe
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```powershell
 cmake --build build --config Debug --target instance_completed
@@ -151,7 +151,7 @@ cmake --build build --config Debug --target instance_completed
 
 ### Linux
 
-Makefiles 또는 Ninja를 기준으로 빌드하고 실행합니다.
+Build and run with Makefiles or Ninja.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
@@ -159,19 +159,19 @@ cmake --build build --target instance_example
 ./build/main
 ```
 
-완성본이 있다면 위의 CMake 구성 명령을 실행한 뒤, 다음 명령으로 빌드하고 실행합니다.
+If the completed example is available, run the CMake configuration command above, then build and run it with these commands.
 
 ```sh
 cmake --build build --target instance_completed
 ./build/completed/main
 ```
 
-### 실행 결과
+### Expected output
 
-사용 가능한 인스턴스 확장 목록이 출력되는지 확인합니다. 인스턴스 생성 뒤 해제 메시지가 나오는지도 확인해 보세요.
+Check that the available instance extensions are printed. Also check that the destruction message appears after the instance creation message.
 
-이 장의 코드를 완성한 뒤, 실행 결과가 보이도록 터미널을 캡처해 제출합니다.
+After completing the code for this lesson, submit a screenshot of the terminal showing the output.
 
 ---
 
-이 문서는 [Khronos Vulkan Tutorial: Base code](https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/00_Base_code.html)와 [인스턴스](https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/01_Instance.html)를 컴퓨트 실습에 맞게 번역·각색했습니다. 원문과 이 문서는 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)을 따릅니다.
+This document was translated and adapted from [Khronos Vulkan Tutorial: Base code](https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/00_Base_code.html) and [Instance](https://docs.vulkan.org/tutorial/latest/03_Drawing_a_triangle/00_Setup/01_Instance.html) for compute exercises. The original material and this document are licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).

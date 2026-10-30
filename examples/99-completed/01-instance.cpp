@@ -48,7 +48,7 @@ int main()
     {
         ComputeApplication app;
         app.run();
-    } // C API: vkDestroyInstance (app.instance 소멸자)
+    } // C API: vkDestroyInstance (app.instance destructor)
 
     std::cout << "Instance destroyed.\n";
     return 0;
