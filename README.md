@@ -5,7 +5,7 @@ A step-by-step introduction to general-purpose GPU computing (GPGPU) with Vulkan
 ## Tutorials
 
 The examples use Vulkan-Hpp's `vk::raii`. Comments name C API functions only where a call has a one-to-one correspondence with them.
-Starting with lesson 01, open each lesson's `main.cpp` and fill it in by following the code blocks in its README. Available completed examples are in [examples/99-completed/](examples/99-completed/). Lessons 03 through 07 do not include completed source files.
+Starting with lesson 01, open each lesson's `main.cpp` and fill it in by following the code blocks in its README. Available completed examples are in [examples/99-completed/](examples/99-completed/).
 Each example builds independently with CMake from its own directory. Follow the build commands in the corresponding lesson.
 
 1. [00. Environment settings](examples/00-env-settings/README.md): Install development tools, query Vulkan devices, and check the C++ build and shader compilation.

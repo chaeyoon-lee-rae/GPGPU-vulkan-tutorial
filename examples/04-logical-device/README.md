@@ -4,7 +4,7 @@
 
 The previous lesson selected a physical device and compute queue family. Now create a logical device to request work on that device. Specify the features and number of queues to use, then retrieve a handle to the created queue.
 
-Open [main.cpp](main.cpp) and follow the steps below. This lesson does not include a completed source file.
+Open [main.cpp](main.cpp) and follow the steps below. The [completed code](../99-completed/04-logical-device.cpp) is available for comparison.
 
 ## Add members to hold the device and queue
 
@@ -147,6 +147,13 @@ cmake --build build --config Debug --target logical_device_example
 .\build\Debug\main.exe
 ```
 
+Build and run the completed example with these commands in the same configuration.
+
+```powershell
+cmake --build build --config Debug --target logical_device_completed
+.\build\completed\Debug\main.exe
+```
+
 ### Linux
 
 Build and run with Makefiles or Ninja.
@@ -155,6 +162,13 @@ Build and run with Makefiles or Ninja.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build --target logical_device_example
 ./build/main
+```
+
+Build and run the completed example with these commands in the same configuration.
+
+```sh
+cmake --build build --target logical_device_completed
+./build/completed/main
 ```
 
 ### Expected output
